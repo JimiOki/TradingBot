@@ -1,0 +1,7 @@
+default_data_source: yfinance
+timezone: UTC
+data_root: data
+raw_data_dir: data/raw
+curated_data_dir: data/curated
+features_data_dir: data/features
+backtest_results_dir: data/backtests

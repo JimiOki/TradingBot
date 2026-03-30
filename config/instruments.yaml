@@ -1,0 +1,7 @@
+instruments:
+  - symbol: SPY
+    asset_type: etf
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    adjusted_prices: true

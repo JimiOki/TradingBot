@@ -1,6 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-lab"
+version = "0.1.0"
+description = "Local research and execution environment for systematic trading."
+requires-python = ">=3.11"
+dependencies = [
+  "backtrader",
+  "ipykernel",
+  "jupyterlab",
+  "matplotlib",
+  "numpy",
+  "pandas",
+  "polars",
+  "pyarrow",
+  "python-dotenv",
+  "requests",
+  "scikit-learn",
+  "ta",
+  "yfinance",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.black]
 line-length = 100
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

@@ -1,21 +1,26 @@
+import sys
 from pathlib import Path
-import pandas as pd
-import yfinance as yf
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
+SRC_DIR = BASE_DIR / "src"
 
-ticker = "SPY"
-df = yf.download(ticker, period="6mo", interval="1d", auto_adjust=True)
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-if df.empty:
-    raise RuntimeError("No data downloaded.")
 
-output_file = DATA_DIR / f"{ticker.lower()}_daily.parquet"
-df.to_parquet(output_file)
+def main() -> None:
+    from trading_lab.data.models import MarketDataRequest
+    from trading_lab.data.yfinance_ingest import ingest_yfinance_daily
 
-print("Downloaded rows:", len(df))
-print("Columns:", list(df.columns))
-print("Saved to:", output_file)
-print(df.tail())
+    request = MarketDataRequest(symbol="SPY", period="6mo", interval="1d", adjusted=True)
+    raw_file, curated_file, curated_df = ingest_yfinance_daily(request)
+
+    print("Downloaded rows:", len(curated_df))
+    print("Columns:", list(curated_df.columns))
+    print("Raw saved to:", raw_file)
+    print("Curated saved to:", curated_file)
+    print(curated_df.tail())
+
+
+if __name__ == "__main__":
+    main()
