@@ -111,6 +111,16 @@ The following decisions have been made and should be treated as fixed constraint
 | Broker execution | IG REST API |
 | Live data | IG Streaming API |
 | Storage | Parquet files |
+| LLM explanation | Claude API (Anthropic) — swappable |
+
+### LLM Signal Explanation
+- After each signal is generated, an LLM API call produces a plain English explanation of why
+- The explanation is displayed alongside the signal in the dashboard
+- Input to the LLM: instrument name, signal direction, current price, SMA values, RSI value, recent price summary, suggested stop/target, risk/reward ratio
+- The LLM used is the Claude API (Anthropic) as the default, but the integration must be designed so the provider is swappable
+- LLM API key stored in `.env`, never hardcoded
+- If the LLM call fails, the signal is still shown — explanation degrades gracefully to "explanation unavailable"
+- Explanation is generated per signal per day and cached — not re-called on every dashboard page load
 
 ## Responsibilities
 

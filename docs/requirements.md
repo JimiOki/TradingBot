@@ -18,18 +18,25 @@
    - 3.4 [Watchlist Management](#34-watchlist-management)
    - 3.5 [Streamlit Dashboard — Phase 1](#35-streamlit-dashboard--phase-1)
    - 3.6 [Non-Functional Requirements](#36-non-functional-requirements)
-4. [Phase 2 — IG Demo Account, Paper Trading, Signal Approval Workflow](#4-phase-2--ig-demo-account-paper-trading-signal-approval-workflow)
+   - 3.7 [LLM Signal Explanation](#37-llm-signal-explanation)
+   - 3.8 [Stop Loss and Take Profit Recommendations](#38-stop-loss-and-take-profit-recommendations)
+   - 3.9 [Exit Signal Recommendations](#39-exit-signal-recommendations)
+   - 3.10 [Signal Quality and Intelligence](#310-signal-quality-and-intelligence)
+   - 3.11 [Risk Management](#311-risk-management)
+   - 3.12 [Market Context](#312-market-context)
+   - 3.13 [Strategy Validation](#313-strategy-validation)
+4. [Phase 2 — IG Demo Account, Paper Trading, Indices, Signal Approval Workflow](#4-phase-2--ig-demo-account-paper-trading-indices-signal-approval-workflow)
    - 4.1 [IG API Integration](#41-ig-api-integration)
    - 4.2 [Signal Approval Workflow](#42-signal-approval-workflow)
    - 4.3 [Paper Trade Execution and Position Tracking](#43-paper-trade-execution-and-position-tracking)
    - 4.4 [Trade Journal and Signal History](#44-trade-journal-and-signal-history)
    - 4.5 [Streamlit Dashboard — Phase 2 Additions](#45-streamlit-dashboard--phase-2-additions)
    - 4.6 [Non-Functional Requirements — Phase 2](#46-non-functional-requirements--phase-2)
-5. [Phase 3 — IG Live Account, Indices, Live Risk Controls](#5-phase-3--ig-live-account-indices-live-risk-controls)
+5. [Phase 3 — IG Live Account, Forex, Live Risk Controls](#5-phase-3--ig-live-account-forex-live-risk-controls)
    - 5.1 [Live Order Placement](#51-live-order-placement)
    - 5.2 [Live Position and Account Monitoring](#52-live-position-and-account-monitoring)
    - 5.3 [Risk Controls for Live Capital](#53-risk-controls-for-live-capital)
-   - 5.4 [Indices Expansion](#54-indices-expansion)
+   - 5.4 [Forex Expansion](#54-forex-expansion)
    - 5.5 [Streamlit Dashboard — Phase 3 Additions](#55-streamlit-dashboard--phase-3-additions)
    - 5.6 [Non-Functional Requirements — Phase 3](#56-non-functional-requirements--phase-3)
 6. [Discretionary Workflow — End to End](#6-discretionary-workflow--end-to-end)
@@ -52,10 +59,12 @@ In scope:
 - Reporting backtest performance metrics
 - Managing a watchlist via YAML configuration
 - Streamlit dashboard: signal table, price charts with indicator overlays, portfolio summary, data refresh trigger
+- Persisting computed signals to disk so the dashboard reads the latest results from files, not in-memory state
 
 Out of scope:
 - Any broker API integration beyond the existing execution stub
 - Live order placement in any form (paper or live)
+- Position-state-dependent risk controls that require open positions or trade journal state
 - Machine learning or statistical models
 - Portfolio optimisation or mean-variance allocation
 - Cloud storage or deployment
@@ -65,7 +74,7 @@ Out of scope:
 - Instrument correlation analysis (deferred — depends on having a clean multi-instrument dataset first)
 - Exposure summary with deployed capital (requires execution layer — deferred to Phase 2)
 
-### Phase 2 — IG Demo Account (paper trading, signal approval, no live capital at risk)
+### Phase 2 — IG Demo Account (paper trading, indices, signal approval, no live capital at risk)
 
 In scope:
 - Authenticating to IG demo account via REST API
@@ -76,23 +85,24 @@ In scope:
 - Signal history persistence (what was recommended vs what happened)
 - Exposure summary (demo account positions)
 - Live market data via IG Streaming API replacing yfinance for execution timing
+- Adding indices instruments to the watchlist and signal pipeline
 
 Out of scope:
 - Any action against the IG live account
 - Automated execution without user approval
-- Indices instruments (Phase 3)
+- Forex instruments (Phase 3)
 
-### Phase 3 — IG Live Account (real capital, expanded instruments, live risk controls)
+### Phase 3 — IG Live Account (real capital, forex, live risk controls)
 
 In scope:
 - Switching from demo to live IG credentials via a single config/env change
 - Enforcing pre-execution risk controls (position limits, daily loss limit, exposure cap)
-- Adding indices instruments to the watchlist and signal pipeline
+- Adding forex instruments to the watchlist and signal pipeline
 - Actual vs backtest performance tracking
 - Kill switch to halt all activity within 60 seconds
 
 Out of scope:
-- Forex instruments (future phase)
+- New asset classes beyond forex
 - Fully automated execution without user approval (may be considered as a future phase)
 
 ---
@@ -327,6 +337,18 @@ Allow rule-based strategies to consume normalised bar data and emit a signal col
 
 ---
 
+#### REQ-SIG-007 - Phase 1 signal persistence
+
+**Requirement:** Every computed Phase 1 signal must be written to a persisted snapshot on disk before the dashboard reads it.
+
+**Acceptance criteria:**
+- The latest Phase 1 signal snapshot is written to a stable file path under `data/signals/`.
+- The Dashboard page reads the signal table from that persisted snapshot instead of recomputing signals on page load.
+- A refresh run overwrites the previous snapshot only after the new signals have been computed successfully.
+- The persisted snapshot contains the latest per-instrument signal summary and indicator context needed by the dashboard.
+
+---
+
 ### 3.3 Backtesting and Evaluation
 
 #### Objective
@@ -351,15 +373,14 @@ Run reproducible simulations of strategy performance on historical curated data,
 
 #### REQ-BT-002 — No-lookahead enforcement
 
-**Requirement:** The backtest engine must not allow a signal generated on bar N to result in a trade executed at bar N's close price. Execution must occur at the open of bar N+1.
+**Requirement:** The backtest engine must not allow a signal generated on bar N to affect the same bar's result. The conceptual execution point is the open of bar N+1, but Phase 1 approximates fills at the next bar close because yfinance daily OHLC data does not provide execution-quality next-bar open fills. A configurable slippage buffer must be applied to that approximation.
 
 **Acceptance criteria:**
 - The engine shifts the signal column by one bar before applying it to price series.
 - A unit test constructs a synthetic signal series where a signal fires on bar 5 and confirms no position change occurs before bar 6.
-- The assumed execution price (next-bar open) is documented in a module-level docstring in `engine.py`.
-- A comment records the known limitation: daily OHLC data from yfinance does not expose intraday open prices; next-bar open is approximated as next-bar close for the Phase 1 cost model.
-
-**Open question OQ-BT-001:** If execution is intended to occur at next-day open rather than next-day close, the backtest will overstate achievable returns for trending strategies. A decision on execution price assumption must be recorded before the first backtest result is shared externally.
+- The Phase 1 execution approximation is documented in a module-level docstring in `engine.py` as next-bar close with slippage.
+- The slippage buffer is configurable and is applied on every position change.
+- The note about next-bar open remains in the documentation as the conceptual execution target for later execution layers.
 
 ---
 
@@ -471,12 +492,12 @@ Allow the user to define a set of instruments of interest that drives data inges
 
 #### REQ-WATCH-002 — Portfolio-level signal view
 
-**Requirement:** A function must exist that, given the full instrument list and a target strategy, returns a consolidated signal summary across all instruments for the most recent available bar.
+**Requirement:** A function must exist that, given the full instrument list and a target strategy, returns a consolidated signal summary across all instruments by reading the latest persisted signal snapshot from disk.
 
 **Acceptance criteria:**
 - The output is a DataFrame with one row per instrument containing at minimum: `symbol`, `name`, `timestamp_of_last_bar`, `signal`, `close`, `fast_sma`, `slow_sma`, `rsi`.
 - If a curated data file is absent for an instrument, that instrument appears in the output with `signal=None` and `status="data_missing"`, not as a missing row.
-- The function does not trigger a data refresh; it operates on whatever curated files are currently on disk.
+- The function does not trigger a data refresh or recompute signals; it operates on whatever persisted signal snapshot is currently on disk.
 - A unit test verifies the `data_missing` behaviour using a mock filesystem.
 
 ---
@@ -509,7 +530,7 @@ Provide a locally-run browser dashboard that surfaces signal recommendations, pr
 - `Signal` is displayed with a colour indicator: green for Buy, red for Sell, grey for Neutral.
 - Rows where data is missing (no curated file on disk) display a status of `Data Missing` in the Signal column, not an error or blank cell.
 - The table is sortable by `Signal` and `Symbol` columns.
-- The table reflects the most recently computed signals from curated data on disk; it does not recompute signals on each page load. A manual refresh button triggers recomputation.
+- The table reflects the most recently persisted signals snapshot from disk; it does not recompute signals on each page load. A manual refresh button triggers recomputation and writes a new snapshot.
 
 ---
 
@@ -635,11 +656,657 @@ All scripts and the backtest engine must emit structured log output (at minimum:
 
 The `backtrader` package is listed in the development environment but the project has built its own backtest engine. Before Phase 1 is closed, a decision must be recorded in this document: either adopt `backtrader` as the engine (and retire the custom engine) or remove `backtrader` from dependencies. The two must not coexist in an ambiguous state.
 
+#### REQ-NFR-LLM-001 — LLM API cost minimisation through caching
+
+LLM API calls must be minimised. Every explanation must be generated at most once per signal per calendar day and persisted to disk. Subsequent dashboard loads on the same day must read from the cache and must not trigger a new API call. The cache must be invalidated automatically when a new signal is generated for the same instrument on a new day.
+
+**Acceptance criteria:**
+- A dashboard page load for an instrument that already has a cached explanation for today's signal does not make any outbound API call; a unit test or integration test confirms this using a mock HTTP client.
+- The cache file location follows the same directory convention as signal output files (`data/signals/` or equivalent) and uses a consistent naming scheme that encodes instrument symbol and date.
+- Explanation cache files are excluded from version control via `.gitignore`.
+- Metrics for total LLM API calls per run are logged at `INFO` level so cost can be monitored.
+
 ---
 
-## 4. Phase 2 — IG Demo Account, Paper Trading, Signal Approval Workflow
+#### REQ-OPS-001 — Audit log
 
-Phase 2 begins only after Phase 1 is complete and all Phase 1 tests pass. No Phase 2 code may be merged until Phase 1 is stable.
+**Requirement:** The system must write a structured audit log recording every signal generated, every user action (approve/reject), and every LLM API call, with sufficient detail to reconstruct the decision trail for any instrument on any day.
+
+**Acceptance criteria:**
+- Every audit log entry contains at minimum: `timestamp` (ISO 8601 UTC), `instrument` (symbol), `action` (one of: `signal_generated`, `signal_approved`, `signal_rejected`, `llm_call_made`, `llm_call_cached`, `llm_call_failed`), and `values` (a structured dict with action-specific fields, e.g. signal direction, LLM response time, error message).
+- Log entries are written to a dedicated structured log file at `logs/audit.log` in JSON-lines format (one JSON object per line).
+- Audit log entries are appended; the file is never truncated by application code.
+- Log entries older than 90 calendar days are not automatically deleted by application code. Retention management is the operator's responsibility.
+- A unit test verifies that a signal generation event produces an audit entry with the correct `action` field and non-null `instrument` and `timestamp` fields.
+
+---
+
+#### REQ-OPS-002 — Data freshness indicator
+
+**Requirement:** The dashboard must display, for each instrument, the timestamp of the last successful data refresh, and must flag any instrument whose data has not been refreshed within the past 24 hours.
+
+**Acceptance criteria:**
+- The signal table on the Dashboard page includes a `Last Refreshed` column showing the UTC timestamp of the most recent successful ingest for each instrument.
+- Any instrument with a `Last Refreshed` timestamp more than 24 hours before the current system time is highlighted with a visual staleness indicator (e.g. amber background or warning icon).
+- The freshness check uses the curated Parquet file's most recent bar timestamp, not the OS file modification time.
+- An instrument with no curated file on disk displays `Never` in the `Last Refreshed` column rather than an error or blank cell.
+- The 24-hour threshold is a named constant in the dashboard code, not a magic number.
+
+---
+
+#### REQ-OPS-003 — Push notifications (Phase 2)
+
+**Requirement:** When a new trading signal fires, the system must optionally send a push notification to the user's configured device. This is a Phase 2 feature; it is not required for Phase 1 completion.
+
+**Acceptance criteria:**
+- Push notification delivery uses a free, no-auth-registration service — either ntfy.sh or Pushover — configured via an environment variable (`PUSH_NOTIFICATION_URL` or equivalent).
+- Notifications are enabled/disabled via a boolean flag in `config/settings.yaml` (`notifications.enabled`). Disabling requires no code change.
+- A notification payload contains at minimum: instrument name, signal direction (Buy/Sell), and the current close price.
+- If the push notification call fails for any reason, the failure is logged at `WARNING` level and does not interrupt signal generation or dashboard rendering.
+- When `notifications.enabled` is `false`, no outbound HTTP call to the notification service is made; a unit test asserts this using a mock HTTP client.
+
+**Assumption A-013:** The user's device can receive push notifications from the configured service (ntfy.sh app or Pushover app installed). Network connectivity between the local machine and the notification service is available.
+
+---
+
+#### REQ-OPS-004 — Dark mode
+
+**Requirement:** The Streamlit dashboard must default to dark mode.
+
+**Acceptance criteria:**
+- The Streamlit `config.toml` file sets `[theme] base = "dark"` so that dark mode is active on first launch without any user action.
+- The dark mode setting is committed to version control so all users of the repository share the same default.
+- Chart colours (candlestick bodies, SMA lines, RSI subplot) are visually legible against a dark background — white or near-white backgrounds for chart areas are not used.
+
+---
+
+#### REQ-OPS-005 — Backtest comparison across instruments
+
+**Requirement:** The Backtests page must support running the same strategy configuration across multiple instruments simultaneously and displaying the results in a single comparative table.
+
+**Acceptance criteria:**
+- A "Compare Instruments" mode on the Backtests page allows the user to select two or more instruments from the watchlist and run the same strategy YAML configuration against each.
+- Results are displayed in a single table with one row per instrument, showing at minimum: instrument name, total return, annualised return, Sharpe ratio, maximum drawdown, win rate, and number of trades.
+- The best-performing instrument by total return is highlighted in the results table.
+- Each row in the results table is expandable to show the full equity curve for that instrument.
+- If the backtest for any instrument fails (e.g. insufficient data), that row displays the error reason rather than crashing the entire comparison run.
+- The comparison uses the same `BacktestConfig` parameters (date range, costs, strategy params) for all selected instruments; per-instrument overrides are not supported in this mode.
+
+---
+
+### 3.7 LLM Signal Explanation
+
+#### Objective
+
+After each trading signal is generated, call an LLM API to produce a plain English explanation of why the signal was generated. The explanation is displayed alongside the signal in the Streamlit dashboard. Explanations are cached to disk to avoid repeated API calls on every page load.
+
+---
+
+#### REQ-LLM-001 — LLM explainer interface contract
+
+**Requirement:** The LLM explanation subsystem must be implemented behind an abstract interface so that the underlying LLM provider (Claude API by default) can be swapped without modifying signal generation or dashboard code.
+
+**Acceptance criteria:**
+- An abstract base class `SignalExplainer` (or equivalent protocol) declares a single method — e.g. `explain(signal_context: SignalContext) -> str` — with no provider-specific logic.
+- `AnthropicSignalExplainer` is the default concrete implementation and uses the Claude API.
+- A `FakeSignalExplainer` (or equivalent stub) exists in the test suite and returns a fixed string without making network calls; all unit tests that exercise explanation-adjacent code use this stub.
+- Swapping the explainer implementation requires only a configuration change (e.g. a key in `config/settings.yaml` or an environment variable), not a source-code change.
+
+**Assumption:** The Claude API (Anthropic) is available and accessible from the deployment environment. If it becomes unavailable, the graceful-degradation requirement (REQ-LLM-004) applies.
+
+---
+
+#### REQ-LLM-002 — Signal context passed to LLM
+
+**Requirement:** The payload submitted to the LLM for each signal must contain a defined, complete set of fields so the model has enough context to produce an accurate and useful explanation.
+
+**Acceptance criteria:**
+- The `SignalContext` object (or equivalent dict/dataclass) passed to the explainer contains all of the following fields: instrument name, signal direction (`LONG`, `SHORT`, or `FLAT`), current close price, SMA 50 value, SMA 200 value, RSI value, recent price trend summary (e.g. a short human-readable string such as "price has risen 4.2% over the past 5 bars"), suggested stop loss price, suggested take profit price, and risk/reward ratio.
+- A unit test confirms that a `SignalContext` constructed from a known signals DataFrame row contains all required fields and no field is `None` or `NaN`.
+- The explainer implementation must not accept a raw signals DataFrame directly; it must receive only the structured `SignalContext` object, enforcing the boundary between signal generation and explanation logic.
+
+**Assumption:** Stop loss, take profit, and risk/reward ratio are derived from the strategy's output columns (or a dedicated risk module) and are available at the time explanation is requested. If these fields are not yet present in the signal output, the dependent fields must be added to the signal schema before REQ-LLM-002 can be considered complete.
+
+---
+
+#### REQ-LLM-003 — LLM output format and consistency
+
+**Requirement:** The LLM must return a plain English explanation of 3–5 sentences. The explanation must be directionally consistent with the signal it describes and must not contradict the trade direction.
+
+**Acceptance criteria:**
+- The prompt sent to the LLM explicitly instructs it to produce between 3 and 5 sentences, in plain English, suitable for a non-technical trader.
+- The prompt explicitly instructs the LLM that if the signal is `LONG`, the explanation must not suggest selling or a bearish view, and vice versa for `SHORT`. If the signal is `FLAT`, the explanation must clearly state why no trade action is recommended.
+- A post-generation validation step checks that the returned string is non-empty and does not exceed a defined character limit (e.g. 1 000 characters). If the validation fails, the explanation is treated as unavailable and the graceful-degradation path (REQ-LLM-004) is triggered.
+- The prompt template is stored in a dedicated file or configuration location (not embedded in the explainer class body) so it can be reviewed and updated without modifying source code.
+
+**Assumption:** The LLM is capable of following the direction-consistency instruction reliably for the signal types produced by `SmaCrossStrategy`. If future strategies produce signals the model cannot contextualise, prompt revision will be required.
+
+---
+
+#### REQ-LLM-004 — Graceful degradation on LLM failure
+
+**Requirement:** If the LLM API call fails for any reason (network error, API error, timeout, validation failure), the signal must still be displayed in the dashboard. The explanation field must degrade gracefully to a static fallback message.
+
+**Acceptance criteria:**
+- When the LLM call raises any exception or returns an invalid response, the explainer catches the error, logs it at `WARNING` level with the instrument name and error detail, and returns the string `"Explanation unavailable."`.
+- The dashboard renders the fallback string in place of the explanation without raising an exception or showing a stack trace to the user.
+- A unit test simulates an API failure (using the stub or a mock that raises an exception) and confirms the fallback string is returned without propagating the exception.
+- The fallback string `"Explanation unavailable."` is defined as a constant in the explainer module, not duplicated across multiple call sites.
+
+**Assumption:** A failed explanation does not invalidate the signal itself. Signal correctness is independent of the LLM subsystem.
+
+---
+
+#### REQ-LLM-005 — Per-day, per-signal explanation caching
+
+**Requirement:** Explanations must be generated at most once per signal per calendar day and cached to disk. The dashboard must read from the cache on all subsequent loads within the same day rather than calling the LLM API again.
+
+**Acceptance criteria:**
+- After the explainer produces a new explanation, it writes the result to a cache file at a path that encodes the instrument symbol and the signal date (e.g. `data/signals/explanations/GC=F_2026-04-03.json`).
+- On a subsequent request for the same instrument and date, the explainer reads from the cache file and returns its content without making an API call.
+- If the cache file is absent or corrupted (unparseable), the explainer falls back to calling the API and overwrites the cache with the new result.
+- Cache files are human-readable JSON containing at minimum: `instrument`, `date`, `signal_direction`, `explanation`, `generated_at` (ISO 8601 timestamp).
+- A unit test verifies that a second call for the same instrument and date does not invoke the underlying API client (asserted via mock call count).
+
+**Assumption:** Signal outputs are regenerated daily by the scheduled refresh script (REQ-DATA-004). If a new signal is generated on the same calendar day for the same instrument (e.g. due to a manual re-run), the cache for that date is overwritten with a fresh explanation.
+
+---
+
+#### REQ-LLM-006 — API key management
+
+**Requirement:** The Anthropic API key must be stored only in `.env` as `ANTHROPIC_API_KEY` and must never be hardcoded in source code, config files, or committed files.
+
+**Acceptance criteria:**
+- The explainer reads the API key exclusively from the `ANTHROPIC_API_KEY` environment variable at runtime.
+- If `ANTHROPIC_API_KEY` is absent or empty when the explainer is instantiated, a `ConfigurationError` is raised with a message that identifies the missing variable by name.
+- The existing REQ-NFR-003 pre-commit hook or CI check covers this variable name as a forbidden pattern in staged files.
+- A unit test confirms that instantiating the explainer without `ANTHROPIC_API_KEY` set raises `ConfigurationError` (using `monkeypatch` or equivalent to clear the variable).
+
+**Assumption:** `.env` is already excluded from version control by `.gitignore` as required by REQ-NFR-003. No additional `.gitignore` changes are needed solely for this feature.
+
+---
+
+#### REQ-LLM-007 — Dashboard display of explanations
+
+**Requirement:** The Streamlit dashboard must display the LLM-generated explanation alongside the signal for each instrument, within the existing signal table or as an expandable detail view.
+
+**Acceptance criteria:**
+- Each row in the signal table on the Dashboard page includes an accessible explanation — either inline (truncated with a "show more" expander) or via a per-row expander component.
+- The explanation is displayed as plain text; no Markdown or HTML rendering of the LLM output is permitted (to avoid injection risk from unexpected model output).
+- If the explanation for a given instrument is the fallback string `"Explanation unavailable."`, it is displayed in a visually distinct style (e.g. muted text or an italicised note) so the user can distinguish a missing explanation from a real one.
+- The explanation display does not trigger a new LLM API call during a dashboard page load; it reads exclusively from the cache layer provided by REQ-LLM-005.
+- A manual smoke test confirms that an instrument with a cached explanation renders correctly, and an instrument without a cache (simulated by deleting the cache file) renders the fallback string without a dashboard error.
+
+**Assumption:** The Streamlit dashboard is used by a single user on a local machine (consistent with OQ-UI-001). Concurrent read/write access to the explanation cache is not a concern in Phase 1.
+
+---
+
+#### REQ-LLM-008 — News headlines as LLM context
+
+**Requirement:** The LLM explanation subsystem must fetch recent news headlines for each instrument at the time of data refresh and include up to five headlines as additional context in the prompt sent to the LLM.
+
+**Acceptance criteria:**
+- News headlines are fetched using yfinance's built-in news feed (`Ticker.news`) — no additional API key, third-party service, or package beyond the existing yfinance dependency is required.
+- Up to five of the most recent headlines are selected, ordered by recency (newest first). If fewer than five headlines are available, all available headlines are used.
+- Each headline passed to the LLM includes three fields: `title`, `source` (publisher name), and `timestamp` (ISO 8601 UTC).
+- News is fetched at the same time as the price data refresh (REQ-DATA-004) and stored in the signal cache file alongside the signal data, so that the LLM receives the news that was current at the time the signal was generated — not news fetched at dashboard load time.
+- If yfinance returns no news for an instrument (empty list or API error), the LLM call proceeds without news context. The prompt explicitly notes that no recent news is available rather than omitting the field silently.
+- A unit test verifies that when five headlines are available, exactly five are passed to the prompt; and that when zero headlines are available, the prompt contains the "no recent news available" note and makes no reference to specific headlines.
+
+**Assumption A-014:** yfinance's news feed provides headline-level data (title, source, timestamp) that is sufficient for an LLM to form a view. Full article body content is not fetched or passed. The quality of news context depends on yfinance's aggregation of Yahoo Finance's news feed, which may not be comprehensive for all instruments.
+
+---
+
+#### REQ-LLM-009 — News-driven vs technical explanation distinction
+
+**Requirement:** When news headlines are available, the LLM explanation must explicitly distinguish between signal drivers that are purely technical (SMA crossover, RSI) and any corroborating or contradicting news context.
+
+**Acceptance criteria:**
+- The prompt instructs the LLM to structure its explanation in two parts when news is available: (1) technical basis — why the signal fired based on price action and indicators; (2) news context — whether recent headlines support, contradict, or are neutral relative to the signal direction.
+- When news headlines contradict the signal direction (e.g. bearish news on a buy signal), the explanation must explicitly flag this tension rather than presenting a falsely unified narrative.
+- When no news is available, the explanation is purely technical and does not speculate about news that might exist.
+- The post-generation validation step (from REQ-LLM-003) applies equally to news-informed explanations; the explanation must still be 3–5 sentences, non-empty, and within the character limit.
+- A manual review of at least three generated explanations (with and without news context) is performed before this requirement is considered complete, to confirm the model is following the two-part structure instruction.
+
+**Assumption:** The two-part structure instruction increases prompt complexity. If the Claude API model used cannot reliably follow the two-part instruction, the prompt template must be revised. This does not change the requirement itself.
+
+---
+
+### 3.8 Stop Loss and Take Profit Recommendations
+
+#### Objective
+
+Calculate and display ATR-based stop loss and risk/reward-derived take profit levels with every non-flat signal, stored in cache alongside the signal so downstream components (LLM explainer, dashboard, position sizing) always have access to the levels without recomputing them.
+
+---
+
+#### REQ-SL-001 — ATR-based stop loss calculation
+
+**Requirement:** The signal generation pipeline must compute an ATR-based stop loss distance for every non-flat signal and store the resulting stop level alongside the signal.
+
+**Acceptance criteria:**
+- Stop loss distance is calculated as `1.5 × ATR(atr_period)` from the entry price, where `atr_period` defaults to 14 and is configurable per strategy in the strategy YAML file.
+- For a LONG signal, the stop loss level is `entry_price - stop_distance`. For a SHORT signal, the stop loss level is `entry_price + stop_distance`.
+- The ATR is calculated from the curated bar data using the standard Wilder ATR formula (true range = max of: `high - low`, `|high - prev_close|`, `|low - prev_close|`).
+- The computed `stop_loss_level` and `stop_distance` (absolute value) are added as columns to the signals DataFrame output.
+- A unit test verifies that for a LONG signal with a known ATR of 10.0 and `atr_multiplier=1.5`, the stop loss level equals `entry_price - 15.0`.
+- A unit test verifies that for a SHORT signal the stop is placed above entry price.
+
+**Assumption A-015:** The entry price used for stop/target calculation is the close price of the signal bar. In live execution, the actual fill price will differ; the stop level stored in the cache is an estimate for research and display purposes.
+
+---
+
+#### REQ-SL-002 — Take profit calculation
+
+**Requirement:** The signal generation pipeline must compute a take profit level for every non-flat signal based on a configurable risk/reward ratio and store the resulting target level alongside the signal.
+
+**Acceptance criteria:**
+- Take profit distance is calculated as `stop_distance × risk_reward_ratio`, where `risk_reward_ratio` defaults to 2.0 and is configurable per strategy in the strategy YAML file.
+- For a LONG signal, the take profit level is `entry_price + take_profit_distance`. For a SHORT signal, the take profit level is `entry_price - take_profit_distance`.
+- The computed `take_profit_level` is added as a column to the signals DataFrame output.
+- A unit test verifies that with `stop_distance=15.0` and `risk_reward_ratio=2.0`, the take profit distance is 30.0.
+- Both `risk_reward_ratio` and `atr_multiplier` are validated at strategy load time: `atr_multiplier` must be positive and non-zero; `risk_reward_ratio` must be ≥ 1.0. A `ConfigValidationError` is raised if either constraint is violated.
+
+---
+
+#### REQ-SL-003 — Dashboard display of stop and target levels
+
+**Requirement:** The signal table on the Dashboard page must display the stop loss level and take profit level for every instrument with an active non-flat signal.
+
+**Acceptance criteria:**
+- The signal table adds two new columns: `Stop Loss` and `Take Profit`, showing the computed levels to the same decimal precision as the instrument's close price.
+- For instruments with a FLAT signal (`signal = 0`), both columns display `—` (an em-dash or equivalent) rather than a value, blank cell, or zero.
+- Both levels are also displayed in the signal detail expander (the same expandable panel used for LLM explanations per REQ-LLM-007).
+- The risk/reward ratio is displayed alongside the stop and target (e.g. `R/R: 2.0`), computed from the cached values rather than recalculated in the dashboard.
+
+---
+
+#### REQ-SL-004 — Stop and target persistence in signal cache
+
+**Requirement:** The stop loss level, take profit level, ATR value, and risk/reward ratio must be stored in the signal cache file so they are available to the LLM explainer, dashboard, and position sizing components without recomputation.
+
+**Acceptance criteria:**
+- The signal cache file (as defined by REQ-LLM-005) is extended to include the fields: `stop_loss_level`, `take_profit_level`, `atr_value` (the raw ATR at the time of signal generation), `atr_multiplier`, and `risk_reward_ratio`.
+- All five fields are present and non-null for every cached signal with direction LONG or SHORT.
+- For FLAT signals, the fields are present in the cache schema but set to `null`.
+- The `SignalContext` object (REQ-LLM-002) is updated to include `stop_loss_level` and `take_profit_level`, which are read from the cache rather than recomputed.
+
+---
+
+### 3.9 Exit Signal Recommendations
+
+#### Objective
+
+Define a phased approach to exit management: Phase 1 provides display-only stop and target levels for the user to act on manually; Phase 2 adds active monitoring of open positions and programmatic CLOSE recommendations; Phase 3 automates stop placement via the IG API at order entry.
+
+---
+
+#### REQ-EXIT-001 — Phase 1: Display stop and target levels (display only)
+
+**Requirement:** In Phase 1, the stop loss and take profit levels computed by REQ-SL-001 and REQ-SL-002 must be displayed for each active signal. No automated exit monitoring or recommendation is performed. All exit decisions remain with the user.
+
+**Acceptance criteria:**
+- Stop loss and take profit levels are visible in the signal table and signal detail panel (satisfied by REQ-SL-003).
+- No automated close recommendation is generated in Phase 1.
+- No polling of open positions occurs in Phase 1 (no execution layer exists).
+- Dashboard documentation or tooltip text on the stop/target columns makes clear that these are reference levels for the user's own position management, not automated instructions.
+
+---
+
+#### REQ-EXIT-002 — Phase 2: Open position tracking for exit monitoring
+
+**Requirement:** In Phase 2, the system must track open positions recorded in the trade journal and continuously evaluate each position against its exit conditions.
+
+**Acceptance criteria:**
+- The exit monitoring component reads open trades from `data/journal/trades.parquet` (REQ-JOURNAL-001) to identify positions that have not yet been closed.
+- For each open position, the monitor evaluates the following exit conditions on each data refresh (see REQ-EXIT-003 for full condition list).
+- The exit monitor runs as part of the scheduled data refresh cycle, not as a separate persistent process.
+- A unit test verifies that a position with no exit conditions met produces no CLOSE recommendation.
+
+---
+
+#### REQ-EXIT-003 — Phase 2: Exit condition evaluation
+
+**Requirement:** The exit monitor must evaluate five exit conditions for each open position and generate a CLOSE recommendation when any condition is met.
+
+**Acceptance criteria:**
+- The following five conditions are evaluated, and a CLOSE recommendation is generated if any one is true:
+  1. **Stop hit:** current close price is at or beyond the stored `stop_loss_level` (at or below for LONG; at or above for SHORT).
+  2. **Target hit:** current close price is at or beyond the stored `take_profit_level` (at or above for LONG; at or below for SHORT).
+  3. **Opposite signal:** the strategy has generated a signal in the opposite direction to the open position (e.g. a SELL signal fires while a LONG position is open).
+  4. **Signal age:** the number of calendar days since the signal was generated exceeds `exit.max_signal_age_days`, which defaults to 10 and is configurable per strategy in the strategy YAML.
+  5. **RSI extreme:** for a LONG position, RSI exceeds 80; for a SHORT position, RSI falls below 20. The RSI thresholds are named constants, configurable in the strategy YAML.
+- Each CLOSE recommendation records which exit condition triggered it.
+- All five thresholds (`stop_loss_level`, `take_profit_level`, opposite signal logic, `max_signal_age_days`, RSI thresholds) are stored per-position and evaluated against current market data at each refresh.
+- A unit test for each of the five conditions verifies that the condition correctly triggers a CLOSE recommendation when the threshold is crossed, and does not trigger when the threshold is not yet reached.
+
+---
+
+#### REQ-EXIT-004 — Phase 2: CLOSE recommendation display
+
+**Requirement:** When the exit monitor generates a CLOSE recommendation for an open position, that recommendation must be displayed prominently in the dashboard.
+
+**Acceptance criteria:**
+- A CLOSE recommendation is displayed at the top of the Dashboard page, above the signal table, in a visually distinct panel (e.g. a warning-coloured banner or card).
+- The panel displays: instrument name, position direction, the exit condition that triggered the recommendation, the current close price, and the stored stop/target levels for reference.
+- Multiple simultaneous CLOSE recommendations (for different instruments) are each shown as separate cards or rows within the panel.
+- A CLOSE recommendation does not automatically place a close order; it is a recommendation only. User action is required (Phase 2 remains fully discretionary).
+- Once the user has manually closed the position (reflected by the trade journal update), the CLOSE recommendation disappears from the panel.
+
+---
+
+#### REQ-EXIT-005 — Phase 2: CLOSE recommendation persistence
+
+**Requirement:** Each CLOSE recommendation generated by the exit monitor must be persisted to the signal cache so it survives a dashboard restart.
+
+**Acceptance criteria:**
+- CLOSE recommendations are appended to `data/journal/signals.parquet` (REQ-JOURNAL-002) as a new signal record with `signal = 0` (exit to flat) and a `trigger_condition` field identifying which exit condition fired.
+- A CLOSE recommendation for the same position is not duplicated if the exit condition persists across multiple refresh cycles. Only one active CLOSE recommendation per open position exists at any time.
+- A unit test verifies that generating two consecutive refresh cycles with the same exit condition results in only one CLOSE recommendation record, not two.
+
+---
+
+#### REQ-EXIT-006 — Phase 2: Exit monitoring configuration
+
+**Requirement:** All thresholds used by the exit monitor must be configurable per strategy in the strategy YAML file and must not be hardcoded.
+
+**Acceptance criteria:**
+- The strategy YAML supports the following exit-related fields: `exit.max_signal_age_days` (default 10), `exit.rsi_long_exit_threshold` (default 80), `exit.rsi_short_exit_threshold` (default 20).
+- The config loader validates these fields at strategy load time: `max_signal_age_days` must be a positive integer; RSI thresholds must be in the range `[0, 100]`; `rsi_long_exit_threshold` must be greater than `rsi_short_exit_threshold`.
+- A `ConfigValidationError` is raised with the offending field name if any constraint is violated.
+
+**Assumption A-016:** The exit monitor operates on daily bar data. Intraday stop-out or target-hit events between daily bars will not be detected until the following day's refresh. This is acceptable for the holding period of days to weeks defined in section 2.
+
+---
+
+#### REQ-EXIT-007 — Phase 3: Automated stop loss placement via IG API
+
+**Requirement:** In Phase 3, when a new order is submitted to the IG live account, the system must automatically attach a stop loss order at the computed `stop_loss_level` (REQ-SL-001) as part of the same order submission call.
+
+**Acceptance criteria:**
+- The order submission payload sent to the IG REST API includes a `stopLevel` field set to `stop_loss_level` from the signal cache.
+- If the IG API rejects the stop level (e.g. the level is too close to the current market price), the order is cancelled and the user is shown the IG error message and the minimum permitted stop distance before being asked to confirm with a manually adjusted stop.
+- The `stopLevel` field is required in the order payload; the order submission function raises a `ValidationError` if it is absent. (This is consistent with REQ-EXEC-003.)
+- The automated stop placement is logged in the order audit log (`logs/orders.log`) with the stop level value.
+- A manual test on the IG demo account confirms that the stop appears on the open position immediately after order fill.
+
+---
+
+### 3.10 Signal Quality and Intelligence
+
+#### Objective
+
+Augment each signal with a computed confidence score and supporting quality indicators so the user can quickly assess how strong and clean the signal is before deciding to act on it.
+
+---
+
+#### REQ-QUAL-001 — Confidence score
+
+**Requirement:** The signal generation pipeline must compute a confidence score in the range 0–100 for every non-flat signal, based on indicator agreement.
+
+**Acceptance criteria:**
+- The confidence score formula is: `base(50) + sma_bonus(0 or 25) + rsi_bonus(0 or 25)`.
+  - `sma_bonus = 25` if the absolute SMA gap (`|fast_sma - slow_sma|`) is greater than 1% of the current close price; otherwise 0.
+  - `rsi_bonus = 25` if RSI confirms the signal direction: RSI < 40 for a LONG signal, RSI > 60 for a SHORT signal. RSI in the range [40, 60] is treated as neutral and contributes 0 bonus regardless of signal direction.
+- For FLAT signals, the confidence score is `null`.
+- The `confidence_score` is added as a column to the signals DataFrame and stored in the signal cache.
+- The dashboard displays the confidence score as a percentage (e.g. `75%`) alongside each signal.
+- A unit test verifies all four possible score combinations: 50, 75 (sma only), 75 (rsi only), 100 (both bonuses).
+- The formula constants (base 50, sma bonus 25, rsi bonus 25, sma gap threshold 1%, RSI neutral band 40–60) are defined as named constants, not magic numbers inline.
+
+**Assumption A-017:** The confidence score is a heuristic indicator aid, not a probabilistic forecast. It is displayed as a guide to signal conviction; it does not gate signal display or execution.
+
+---
+
+#### REQ-QUAL-002 — Signal strength indicator
+
+**Requirement:** The dashboard must display the SMA gap as a percentage of the current close price alongside each signal, labelled as signal strength.
+
+**Acceptance criteria:**
+- Signal strength is calculated as `(|fast_sma - slow_sma| / close_price) × 100`, expressed as a percentage rounded to two decimal places.
+- The `signal_strength_pct` is added as a column to the signals DataFrame and stored in the signal cache.
+- The dashboard signal table displays signal strength alongside the signal direction (e.g. `BUY (1.42%)`).
+- For FLAT signals, signal strength displays `—` in the dashboard (not zero, which could be misleading).
+
+---
+
+#### REQ-QUAL-003 — Conflicting indicator warning
+
+**Requirement:** When the SMA crossover direction and the RSI reading point in opposite directions, the dashboard must display a warning on that instrument's signal card.
+
+**Acceptance criteria:**
+- A conflict is defined as: the SMA crossover fires a LONG signal while RSI is above 60, or the SMA crossover fires a SHORT signal while RSI is below 40.
+- When a conflict is detected, a `conflicting_indicators` boolean flag is set to `True` in the signal cache for that instrument.
+- The dashboard displays a warning indicator (e.g. a caution icon or amber label `Conflicting Indicators`) on any signal row where `conflicting_indicators` is `True`.
+- The LLM explanation prompt (REQ-LLM-002) is updated to include the `conflicting_indicators` flag; when `True`, the LLM is instructed to acknowledge the conflict in its explanation.
+- A unit test verifies: LONG signal with RSI = 65 produces `conflicting_indicators = True`; LONG signal with RSI = 35 produces `conflicting_indicators = False`.
+
+---
+
+#### REQ-QUAL-004 — Volatility filter and HIGH VOLATILITY flag
+
+**Requirement:** If the current ATR(14) exceeds twice its 30-day rolling average, the signal must be flagged as HIGH VOLATILITY and a warning displayed in the dashboard.
+
+**Acceptance criteria:**
+- The 30-day rolling average of ATR(14) is computed from the curated bar data at the time of signal generation. The rolling window is 30 trading days.
+- If `current_atr > 2 × rolling_avg_atr`, a `high_volatility` boolean flag is set to `True` for that signal.
+- `high_volatility` and `rolling_avg_atr` are stored as columns in the signals DataFrame and in the signal cache.
+- The dashboard displays a prominent `HIGH VOLATILITY` warning on any signal card where `high_volatility` is `True`. The warning must be visually distinct (e.g. a red or amber badge) and not easily overlooked.
+- The warning is displayed regardless of signal direction (LONG, SHORT) or confidence score.
+- A unit test verifies that `high_volatility = True` when `current_atr = 21.0` and `rolling_avg_atr = 10.0` (ratio = 2.1 > 2.0), and `high_volatility = False` when `current_atr = 19.0` and `rolling_avg_atr = 10.0` (ratio = 1.9 < 2.0).
+
+---
+
+### 3.11 Risk Management
+
+> **ID note:** The requirements in this section use the `REQ-RISK-` prefix for Phase 1 risk management features. Pre-existing Phase 3 live-trading risk controls in section 5.3 have been relabelled `REQ-LRISK-001` and `REQ-LRISK-002` to avoid collision.
+
+#### Objective
+
+Surface portfolio-level risk information in the dashboard during Phase 1 research, and define the position-state-dependent controls that will be activated later once trade and position state exist.
+
+---
+
+**Phase note:** `REQ-RISK-001` and `REQ-RISK-002` are designed in Phase 1 but are deferred from the committed Phase 1 build because they require persisted position state. `REQ-RISK-003` and `REQ-RISK-004` remain committed Phase 1 display features.
+
+#### REQ-RISK-001 - Daily loss limit warning (deferred)
+
+**Requirement:** Once trade journal and position state exist, the system must display a warning and suppress new signal display if the user's configured daily loss limit has been reached, as derived from the trade journal.
+
+**Acceptance criteria:**
+- `risk.daily_loss_limit_pct` is configurable in `config/environments/local.yaml` and defaults to 3% of configured capital. Capital is read from `config/environments/local.yaml` as `account.capital`.
+- On each dashboard load and data refresh, the system computes today's realised losses from the trade journal (sum of negative `net_return` values for trades with `exit_timestamp` on the current calendar day).
+- If today's realised losses equal or exceed `daily_loss_limit_pct x capital`, the dashboard displays a prominent warning banner: `DAILY LOSS LIMIT REACHED - No new signals displayed`.
+- When the limit is reached, signal cards for new signals are hidden; existing open positions remain visible.
+- The system does not automatically close any position when the limit is reached; it is a display-only warning.
+- A unit test verifies that with `daily_loss_limit_pct = 0.03` and `capital = 10000`, a daily loss of 300 GBP triggers the warning and a daily loss of 299 GBP does not.
+
+**Assumption A-018:** Phase 1 does not yet have persisted position state, so this requirement is specified now but remains inactive until Phase 2 signal approval and trade journaling are available.
+
+---
+
+#### REQ-RISK-002 - Maximum open positions limit (deferred)
+
+**Requirement:** Once open position state exists, the system must suppress new signal display when the number of currently open positions equals or exceeds the configured maximum.
+
+**Acceptance criteria:**
+- `risk.max_open_positions` is configurable in `config/environments/local.yaml` and defaults to 3.
+- Open position count is derived from the trade journal: trades with a non-null `entry_timestamp` and a null `exit_timestamp` are counted as open.
+- When open positions equal or exceed `max_open_positions`, the dashboard displays a warning: `MAXIMUM POSITIONS REACHED (N open) - No new signals displayed`, where N is the current count.
+- New signal cards are hidden when the limit is reached. Existing open position cards and CLOSE recommendations (REQ-EXIT-004) remain visible.
+- A unit test verifies that with `max_open_positions = 3`, three open trades suppresses new signals and two open trades does not.
+
+**Assumption A-019:** Phase 1 does not yet have persisted position state, so this requirement is specified now but remains inactive until Phase 2 open-position tracking is available.
+
+---
+
+#### REQ-RISK-003 - Correlation warning
+
+**Requirement:** When two or more instruments in the watchlist show the same-direction signal simultaneously and their 60-day rolling price correlation exceeds 0.7, the dashboard must display a correlation warning.
+
+**Acceptance criteria:**
+- The 60-day rolling pairwise Pearson correlation between instruments is computed from their curated daily close price series using a 60-bar rolling window.
+- If two instruments both have an active LONG signal, or both have an active SHORT signal, and their 60-day correlation coefficient exceeds 0.7, a warning is displayed in the dashboard: `CORRELATION WARNING: <Instrument A> and <Instrument B> are highly correlated (r = X.XX) and both show <direction> signals. Consider concentrated risk.`
+- The correlation warning is displayed per pair; if three instruments are correlated and all show the same direction, each pair that exceeds the threshold is shown separately.
+- The correlation coefficient is recomputed on each data refresh from the curated price data; it is not cached between refreshes.
+- The 0.7 threshold is a named constant, not a magic number.
+- A unit test using a synthetic dataset verifies that two instruments with `r = 0.75` and both showing LONG produce a warning, and the same pair with `r = 0.65` does not.
+
+**Assumption A-020:** Correlation is computed from daily close prices in the curated dataset. At least 60 bars of overlapping data must exist for both instruments for the calculation to be valid. If fewer than 60 overlapping bars exist, the correlation check is skipped for that pair and a note is logged at DEBUG level.
+
+---
+
+#### REQ-RISK-004 - Position sizing calculator
+
+**Requirement:** The dashboard must display a recommended position size (in units and GBP risk) for each active non-flat signal, computed from configured capital, risk per trade percentage, and the ATR-based stop loss distance.
+
+**Acceptance criteria:**
+- Position size formula: `position_size_units = (capital x risk_per_trade_pct) / stop_distance`, where `capital` and `risk_per_trade_pct` are from `config/environments/local.yaml` (default `risk_per_trade_pct = 0.01`), and `stop_distance` is the ATR-based value from REQ-SL-001.
+- `GBP_risk` is displayed as `capital x risk_per_trade_pct` (the fixed risk amount for this trade).
+- Both `position_size_units` (rounded down to the nearest whole number) and `GBP_risk` are displayed in the signal detail panel for each active LONG or SHORT signal.
+- If `stop_distance` is zero or null (which should not occur given REQ-SL-001 but must be guarded against), the position size displays `N/A - stop distance unavailable` rather than a division-by-zero error.
+- The calculation inputs (`capital`, `risk_per_trade_pct`, `stop_distance`) are shown transparently in the signal detail panel alongside the result.
+- For FLAT signals, no position size is calculated or displayed.
+- A unit test verifies: `capital = GBP10,000`, `risk_per_trade_pct = 0.01`, `stop_distance = 50` -> `position_size_units = 2`, `GBP_risk = GBP100`.
+### 3.12 Market Context
+
+#### Objective
+
+Provide the user with environmental context — upcoming high-impact economic events, market session status, and signal age — so they can factor external conditions into their review of each signal before acting.
+
+---
+
+#### REQ-CTX-001 — Economic calendar integration
+
+**Requirement:** The dashboard must display warnings for high-impact economic events scheduled within the next 5 trading days that are relevant to the instruments currently showing active signals.
+
+**Acceptance criteria:**
+- Economic calendar data is fetched from a free, publicly accessible source (Investing.com RSS feed or equivalent). No paid API key is required.
+- Events are filtered to those rated as `high impact` by the source. Medium and low impact events are not displayed.
+- Events are matched to instruments by related currency or market (e.g. US economic events are relevant to all USD-denominated commodities in the Phase 1 watchlist: Gold, Oil, Silver, Copper, Natural Gas).
+- Relevant events within the next 5 trading days are displayed as a warning on the signal card for the affected instrument: `UPCOMING EVENT: <event name>, <date>, <time UTC>`.
+- Calendar data is fetched at the same time as the price data refresh and cached to disk. It is not re-fetched on each dashboard page load.
+- If the calendar source is unavailable (HTTP error, timeout, parse failure), the system proceeds without calendar data. Affected signal cards display no event warning. The failure is logged at `WARNING` level.
+- A unit test verifies that when calendar fetch fails, no exception propagates to the dashboard and signal cards render normally.
+
+**Assumption A-021:** The Investing.com RSS feed (or chosen equivalent) provides sufficient event data for the five Phase 1 commodity instruments. The feed URL and parsing logic may need adjustment if the source changes format or becomes unavailable.
+
+---
+
+#### REQ-CTX-002 — Market session awareness
+
+**Requirement:** The dashboard must display whether each instrument's primary market is currently open or closed, based on session hours declared in `instruments.yaml`.
+
+**Acceptance criteria:**
+- Each instrument entry in `instruments.yaml` declares a `session_open` and `session_close` time (HH:MM) alongside the existing `session_timezone` field.
+- The dashboard computes whether the current system time (converted to the instrument's `session_timezone`) falls within `[session_open, session_close]` on a weekday (Monday–Friday). Weekends are always treated as closed.
+- Each signal card and each row in the signal table displays a session status badge: `OPEN` (green) or `CLOSED` (grey).
+- The session calculation is performed at dashboard render time using the current system clock; it is not cached.
+- Public holiday calendars are out of scope for Phase 1. The session logic uses weekday/weekend only.
+- A unit test verifies the session logic for at least three cases: a time within session hours (OPEN), a time outside session hours (CLOSED), and a Saturday (CLOSED regardless of time).
+
+**Assumption A-022:** Session hours for the five Phase 1 commodity futures instruments are sufficiently well-known (e.g. COMEX Gold: 18:00–17:00 ET next day, effectively near-24-hour) that the operator can populate `session_open` and `session_close` accurately in `instruments.yaml`. The system does not auto-detect session hours.
+
+---
+
+#### REQ-CTX-003 — Signal age indicator
+
+**Requirement:** The dashboard must display how many days ago the current signal was generated for each instrument, and must flag signals older than 5 days as STALE.
+
+**Acceptance criteria:**
+- Signal age is computed as the number of calendar days between the signal generation date (the date of the bar on which the signal fired) and the current system date.
+- Each signal card and signal table row displays: `Signal age: N day(s)`.
+- Any signal with age ≥ 5 days displays an additional `STALE` badge (amber or red) alongside the age indicator.
+- The STALE threshold (5 days) is a named constant in the dashboard code, not a magic number.
+- When a signal is generated on the same day as the current date, the displayed age is `0 days` (not `1 day`).
+- A unit test verifies: a signal generated 4 days ago is not marked STALE; a signal generated 5 days ago is marked STALE.
+
+---
+
+### 3.13 Strategy Validation
+
+#### Objective
+
+Prevent overfitting by requiring every strategy to be evaluated against a held-back out-of-sample period that was never used during parameter development. Results from both periods are persisted as separate artefacts, compared on a performance degradation metric, and must meet defined thresholds before the strategy is eligible for Phase 2 paper trading.
+
+---
+
+#### REQ-VAL-001 — In-sample / out-of-sample data split
+
+**Requirement:** The backtesting engine must partition each instrument's curated bar data into a contiguous in-sample period and a contiguous out-of-sample period before any strategy parameter is finalised, such that the out-of-sample period is always the most recent data.
+
+**Acceptance criteria:**
+- The split ratio is configurable per strategy in the strategy YAML file under the key `validation.oos_ratio` (a float in the range 0.10–0.40 inclusive). The default value when the key is absent is `0.30` (30% out-of-sample).
+- The split is applied chronologically: the earliest `(1 − oos_ratio)` fraction of bars form the in-sample period; the most recent `oos_ratio` fraction form the out-of-sample period. No random shuffling of bars is performed at any stage.
+- The split is computed from the full curated bar history available at the time the backtest is run. Adding new data via a subsequent ingest extends the out-of-sample window automatically on the next backtest run.
+- A validation function raises a `DataSplitError` with a descriptive message if the resulting out-of-sample period contains fewer than 30 bars, naming the instrument and the actual bar count.
+- A unit test verifies that for a dataset of 200 bars with `oos_ratio = 0.30`, the in-sample period contains exactly 140 bars and the out-of-sample period contains exactly 60 bars, with no bar appearing in both periods.
+
+**Assumption A-023:** Bar counts rather than calendar dates are used to compute the split boundary. This avoids complexity around weekends and public holidays and is consistent with the existing bar-indexed backtest engine. Operators who require a fixed calendar date boundary may override `validation.oos_split_date` in the strategy YAML; if both `oos_ratio` and `oos_split_date` are present, `oos_split_date` takes precedence and `oos_ratio` is ignored.
+
+---
+
+#### REQ-VAL-002 — Parameter lock before out-of-sample evaluation
+
+**Requirement:** Strategy parameters (e.g. SMA windows, RSI thresholds) must be finalised exclusively on in-sample data. The system must enforce that no parameter is changed or re-tuned after the out-of-sample period has been revealed.
+
+**Acceptance criteria:**
+- The backtest runner exposes two explicit execution modes: `mode=in_sample` and `mode=out_of_sample`. The `mode=out_of_sample` run can only be triggered after a `mode=in_sample` run has completed and its results have been written to `data/backtests/` for the same strategy and instrument.
+- Attempting to run `mode=out_of_sample` without a prior `mode=in_sample` artefact raises a `ValidationOrderError` with the message: `"Out-of-sample run blocked: no in-sample artefact found for strategy '<name>' on '<symbol>'. Finalise parameters on in-sample data first."`.
+- The strategy parameter values are read from the strategy YAML at the start of the in-sample run and written verbatim into the in-sample artefact under the key `parameters_locked`. The out-of-sample run reads `parameters_locked` from the artefact and uses those exact values; it does not re-read the strategy YAML for parameters.
+- If the strategy YAML parameter values differ from `parameters_locked` at the time the out-of-sample run is initiated, the run is aborted and a `ParameterDriftError` is raised naming the differing parameter(s) and their in-sample vs current values.
+- A unit test verifies that modifying a strategy parameter in the YAML after an in-sample run and then initiating an out-of-sample run raises `ParameterDriftError`.
+
+---
+
+#### REQ-VAL-003 — Separate artefact persistence
+
+**Requirement:** The backtesting engine must save the in-sample and out-of-sample results as two separate Parquet artefacts in `data/backtests/`, with clearly distinct filenames that identify the period type, strategy name, instrument symbol, and run timestamp.
+
+**Acceptance criteria:**
+- In-sample artefacts are written to `data/backtests/<strategy_name>_<symbol>_in_sample_<YYYYMMDD_HHMMSS>.parquet`.
+- Out-of-sample artefacts are written to `data/backtests/<strategy_name>_<symbol>_out_of_sample_<YYYYMMDD_HHMMSS>.parquet`.
+- Each artefact contains at minimum: the bar-level trades DataFrame, the computed performance metrics (`total_return_pct`, `sharpe_ratio`, `max_drawdown_pct`, `win_rate`, `trade_count`), the split boundary bar index (as `split_bar_index`), the period label (`in_sample` or `out_of_sample`), and the `parameters_locked` dict.
+- Artefacts are written atomically: a temporary file is written first and renamed into the final path only on successful completion. A failed write does not leave a partial file at the final path.
+- A unit test verifies that a complete validation run for one strategy and one instrument produces exactly two files in `data/backtests/` whose names match the expected patterns.
+
+---
+
+#### REQ-VAL-004 — Out-of-sample approval thresholds
+
+**Requirement:** A strategy is eligible for Phase 2 paper trading only if its out-of-sample backtest results meet both of the following thresholds: out-of-sample Sharpe ratio > 0.5 AND out-of-sample maximum drawdown < 25%.
+
+**Acceptance criteria:**
+- The thresholds are defined as named constants in `backtesting/validation.py`: `OOS_MIN_SHARPE = 0.5` and `OOS_MAX_DRAWDOWN_PCT = 25.0`. They are not magic numbers and must not be hardcoded elsewhere.
+- After the out-of-sample run completes, a `validate_oos_thresholds(results)` function evaluates both conditions and returns a `ValidationResult` object with fields `approved: bool`, `sharpe_ratio: float`, `max_drawdown_pct: float`, and `failure_reasons: list[str]`.
+- If either threshold is not met, `approved` is `False` and `failure_reasons` lists each failed condition in plain English (e.g. `"Sharpe ratio 0.38 does not meet minimum threshold of 0.50"`).
+- The dashboard displays the approval status prominently on the strategy validation panel: a green `APPROVED FOR PAPER TRADING` badge if both thresholds are met, or a red `NOT APPROVED` badge with the failure reason(s) if not.
+- The approval status is written into the out-of-sample artefact under the key `oos_approval`.
+- Unit tests verify: a result with Sharpe = 0.6 and drawdown = 20% is approved; a result with Sharpe = 0.4 and drawdown = 20% is not approved (Sharpe failure); a result with Sharpe = 0.6 and drawdown = 28% is not approved (drawdown failure); a result with Sharpe = 0.4 and drawdown = 28% is not approved (both failures listed).
+
+**Assumption A-024:** The Sharpe ratio used for threshold evaluation is computed using daily returns over the out-of-sample period only, with a risk-free rate of zero. This is consistent with the existing backtest engine's Sharpe calculation.
+
+---
+
+#### REQ-VAL-005 — Performance degradation metric and overfitting warning
+
+**Requirement:** The backtesting UI must compute and display a performance degradation metric defined as the difference between the in-sample Sharpe ratio and the out-of-sample Sharpe ratio, and must display a prominent overfitting warning if degradation exceeds 50% of the in-sample Sharpe ratio.
+
+**Acceptance criteria:**
+- Performance degradation is computed as `degradation_pct = ((sharpe_in_sample − sharpe_out_of_sample) / |sharpe_in_sample|) × 100`, expressed as a percentage rounded to one decimal place. This metric is stored in the out-of-sample artefact under the key `degradation_pct`.
+- The dashboard validation panel displays both Sharpe ratios side-by-side (in-sample and out-of-sample) and the degradation percentage as a labelled metric: `Performance Degradation: X.X%`.
+- If `degradation_pct > 50.0`, the dashboard displays a prominent `OVERFITTING WARNING` banner (red background, bold text) on the strategy validation panel. The banner must include the text: `"In-sample Sharpe (X.XX) significantly exceeds out-of-sample Sharpe (X.XX). Strategy may be overfit to historical data."`.
+- The dashboard must visually distinguish which chart regions correspond to the in-sample period and which to the out-of-sample period (e.g. a shaded background region, a vertical dividing line, or distinct axis labels). The labels `In-Sample` and `Out-of-Sample` must appear in the chart.
+- The degradation metric and any overfitting warning are also written to the out-of-sample artefact for auditability.
+- Unit tests verify: in-sample Sharpe = 1.2, out-of-sample Sharpe = 0.5 → `degradation_pct = 58.3%`, overfitting warning displayed; in-sample Sharpe = 1.2, out-of-sample Sharpe = 0.7 → `degradation_pct = 41.7%`, no overfitting warning.
+
+**Assumption A-025:** If `sharpe_in_sample` is zero or negative, the degradation percentage is undefined and is displayed as `N/A` in the dashboard. No overfitting warning is shown in this case, as the in-sample performance itself indicates an unviable strategy.
+
+---
+
+## 4. Phase 2 — IG Demo Account, Paper Trading, Indices, Signal Approval Workflow
+
+Phase 2 begins only after Phase 1 is complete and all Phase 1 tests pass. No Phase 2 code may be merged until Phase 1 is stable. Additionally, a strategy must pass REQ-VAL-004 (out-of-sample approval thresholds) before it is permitted to enter paper trading in Phase 2.
 
 ### 4.1 IG API Integration
 
@@ -727,7 +1394,7 @@ Phase 2 begins only after Phase 1 is complete and all Phase 1 tests pass. No Pha
 **Requirement:** The dashboard must display a suggested position size for each pending signal based on configured risk parameters.
 
 **Acceptance criteria:**
-- Position size is calculated as: `(account_balance * risk_per_trade_pct) / (entry_price - stop_loss_price)`, where all inputs are displayed to the user.
+- Position size is calculated as: `(account_balance * risk_per_trade_pct) / abs(entry_price - stop_loss_price)`, where all inputs are displayed to the user.
 - `risk_per_trade_pct` is configurable in `config/environments/local.yaml` and defaults to 1%.
 - The suggested stop loss is calculated as the signal's `stop_loss_level` output by the strategy, or as `entry_price * (1 - default_stop_pct)` if the strategy does not emit a stop level.
 - The suggested position size is displayed as a number of contracts (or units) rounded down to the nearest integer.
@@ -848,7 +1515,7 @@ The system must prevent submitting more than one order for the same instrument w
 
 ---
 
-## 5. Phase 3 — IG Live Account, Indices, Live Risk Controls
+## 5. Phase 3 — IG Live Account, Forex, Live Risk Controls
 
 Phase 3 begins only after all Phase 2 acceptance criteria are met, at least 30 days of paper trading on the IG demo account have been completed without critical defects, and a risk review sign-off has been recorded in `docs/risk-review.md`.
 
@@ -895,7 +1562,7 @@ Phase 3 begins only after all Phase 2 acceptance criteria are met, at least 30 d
 
 ### 5.3 Risk Controls for Live Capital
 
-#### REQ-RISK-001 — Kill switch
+#### REQ-LRISK-001 — Kill switch
 
 **Requirement:** The system must provide a single action that closes all open positions and prevents any new orders from being placed.
 
@@ -908,7 +1575,7 @@ Phase 3 begins only after all Phase 2 acceptance criteria are met, at least 30 d
 
 ---
 
-#### REQ-RISK-002 — Risk parameter configuration
+#### REQ-LRISK-002 — Risk parameter configuration
 
 **Requirement:** All risk limits governing live trading must be readable from `config/environments/local.yaml` and must not require code changes to adjust.
 
@@ -919,17 +1586,17 @@ Phase 3 begins only after all Phase 2 acceptance criteria are met, at least 30 d
 
 ---
 
-### 5.4 Indices Expansion
+### 5.4 Forex Expansion
 
-#### REQ-IDX-001 — Indices instrument support
+#### REQ-FX-001 — Forex instrument support
 
-**Requirement:** Phase 3 adds index instruments to `instruments.yaml`. The system must support these without code changes.
+**Requirement:** Phase 3 adds forex instruments to `instruments.yaml`. The system must support these without code changes.
 
 **Acceptance criteria:**
-- `asset_class: index` is a valid value (already in the permitted set from REQ-DATA-007).
-- Index instruments added to `instruments.yaml` are ingested, signal-generated, and displayed in the dashboard identically to commodity instruments.
-- Each index instrument entry in `instruments.yaml` includes its IG epic for order placement.
-- The signal table groups instruments by `asset_class` to separate commodities from indices visually.
+- `asset_class: fx` is a valid value (already in the permitted set from REQ-DATA-007).
+- Forex instruments added to `instruments.yaml` are ingested, signal-generated, and displayed in the dashboard identically to commodity instruments.
+- Each forex instrument entry in `instruments.yaml` includes its IG epic for order placement.
+- The signal table groups instruments by `asset_class` to separate commodities from forex visually.
 
 ---
 
@@ -937,7 +1604,7 @@ Phase 3 begins only after all Phase 2 acceptance criteria are met, at least 30 d
 
 #### REQ-UI-013 — Kill switch button
 
-**Requirement:** A Kill Switch button is visible on all pages when `IG_ENVIRONMENT=live`, as specified in REQ-RISK-001.
+**Requirement:** A Kill Switch button is visible on all pages when `IG_ENVIRONMENT=live`, as specified in REQ-LRISK-001.
 
 ---
 
@@ -998,8 +1665,8 @@ This section describes the complete operational workflow in Phase 1 (research on
 3. SIGNAL COMPUTATION:
    - On refresh completion (or on-demand), system runs SmaCrossStrategy with RSI filter
      for all instruments on their curated daily data.
-   - Results written to an in-memory signal summary (not persisted in Phase 1).
-   - Signal table on Dashboard page updates.
+   - Results are written to a persisted signal snapshot under `data/signals/`.
+   - Signal table on Dashboard page reads from that snapshot and updates.
 
 4. HUMAN REVIEW:
    - User reviews the signal table: which instruments show Buy, Sell, or Neutral.
@@ -1118,7 +1785,7 @@ Phase 2 requires submitting orders to IG using IG's internal `epic` identifier (
 
 ### GAP-009 — No signal persistence in Phase 1
 
-Phase 1 computes signals in memory only. Phase 2 requires signal history persistence for the approval workflow. The transition from in-memory signals to persisted signals requires defining the persistence format before Phase 2 begins. This should be designed during Phase 1 even if the write path is not active until Phase 2.
+Phase 1 computes signals and writes them to a persisted snapshot on disk. Phase 2 requires signal history persistence for the approval workflow and extends the same persisted records with approval states.
 
 ### CONFLICT-001 — Backtest engine short-selling constraint vs broker capability
 
@@ -1155,7 +1822,6 @@ These questions must be answered before the indicated requirement can be finalis
 
 | ID | Question | Blocks | Priority |
 |---|---|---|---|
-| OQ-BT-001 | Should the backtest execute at next-bar open or next-bar close? Next-bar close is current behaviour and likely overstates returns. | REQ-BT-002 | High |
 | OQ-BT-002 | Should the backtest support multiple simultaneous positions (e.g. Gold and Oil both long), or is it single-instrument only per run? | BacktestConfig scope, portfolio-level metrics | High |
 | OQ-DATA-001 | What is the intended historical data retention period — 1 year, 5 years, all available? This affects storage sizing and minimum backtest lookback. | REQ-DATA-004, REQ-BT-007 | Medium |
 | OQ-DATA-002 | Should the refresh script be runnable on a schedule (cron, Windows Task Scheduler), or is manual invocation sufficient for all phases? | REQ-DATA-004 | Medium |
@@ -1166,7 +1832,7 @@ These questions must be answered before the indicated requirement can be finalis
 | OQ-DEP-001 | Should `backtrader` be kept, adopted as the engine, or removed from dependencies? | GAP-007, REQ-NFR-008 | Medium |
 | OQ-IG-001 | What are the correct IG epics for the five Phase 1 commodity instruments? These are required before Phase 2 order placement can be implemented. | REQ-EXEC-001, GAP-008 | High (for Phase 2) |
 | OQ-IG-002 | Does the IG spreadbetting demo account support all five commodity instruments (GC=F equivalent, CL=F equivalent, etc.)? Some products may only be available on the live account. | REQ-IG-001, REQ-EXEC-001 | High (for Phase 2) |
-| OQ-RISK-001 | What are the target values for `risk.daily_loss_limit_pct`, `risk.max_exposure_pct`, and `risk.risk_per_trade_pct`? These must be set before Phase 3 goes live. | REQ-LIVE-002, REQ-RISK-001 | High (for Phase 3) |
+| OQ-RISK-001 | What are the target values for `risk.daily_loss_limit_pct`, `risk.max_exposure_pct`, and `risk.risk_per_trade_pct`? These must be set before Phase 3 goes live. | REQ-LIVE-002, REQ-LRISK-001 | High (for Phase 3) |
 | OQ-MTF-001 | How should the annualisation constant be determined for weekly bars — from BacktestConfig, from the data's inferred frequency, or from instruments.yaml? | REQ-BT-008 | Low |
 
 ---
@@ -1233,12 +1899,12 @@ Phase 3 dependencies (require Phase 2 complete + risk review)
 
 REQ-LIVE-001 (credential switch)
     --> REQ-LIVE-002 (pre-submission risk checks)
-    --> REQ-RISK-001 (kill switch)
+    --> REQ-LRISK-001 (kill switch)
     --> REQ-UI-013 (kill switch button)
     --> REQ-UI-015 (risk dashboard panel)
 
-REQ-IDX-001 (indices instruments)
-    --> REQ-DATA-007 (instrument registry — asset_class: index already permitted)
+REQ-FX-001 (forex instruments)
+    --> REQ-DATA-007 (instrument registry — asset_class: index and fx already permitted)
     --> REQ-EXEC-001 (order submission — ig_epic field required per instrument)
 ```
 
@@ -1246,3 +1912,8 @@ REQ-IDX-001 (indices instruments)
 
 *End of Trading Lab Requirements — v2.0*
 *Supersedes: `docs/requirements-phase1.md`*
+
+
+
+
+
