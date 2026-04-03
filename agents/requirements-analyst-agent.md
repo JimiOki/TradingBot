@@ -66,15 +66,51 @@ The following features have been identified as candidates. Requirements have not
 - Live order placement via IG API
 - Open position monitoring
 
-## Critical Open Question
+## Confirmed Design Decisions
 
-The user's trading style has not yet been defined. This is the single most important input before requirements can be finalised:
+The following decisions have been made and should be treated as fixed constraints:
 
-- **Discretionary**: system recommends, user decides
-- **Semi-automated**: user approves signals before execution
-- **Fully automated**: system executes without user intervention
+### Trading Style
+- **Discretionary to start**: system recommends signals, user approves every trade before execution
+- May evolve to semi-automated later, but Phase 1 is human-in-the-loop
 
-All risk control, execution, and UI requirements depend on the answer to this question.
+### Broker
+- **IG spreadbetting** (UK)
+- Supports both long and short positions on all instruments
+- Has a **demo account** with identical API to live — switch is a single config/credential change
+- Demo account must be used for all execution testing before going live
+
+### Instruments & Timeframe
+- **Phase 1**: Commodities (Gold `GC=F`, Oil `CL=F`, Silver `SI=F`, Copper `HG=F`, Natural Gas `NG=F`)
+- **Phase 2**: Indices
+- **Phase 3**: Forex
+- **Timeframe**: Daily bars to start
+- **Holding period**: Days to weeks
+
+### Signal Approach
+- Rule-based signals to start (SMA crossover + RSI filter)
+- ML filtering is a later-phase concern, not Phase 1
+
+### Data Sources
+- **Research & backtesting**: yfinance (daily OHLCV, free, no auth required)
+- **Live trading**: IG Streaming API (real-time candles, bid/ask, account feed)
+- yfinance is not suitable for live execution timing
+
+### Application Type
+- **Streamlit dashboard** (Python, browser-based, runs locally)
+- UI features: signal table, price charts with indicator overlays, approve/reject signal buttons, position summary, data refresh
+- Later: could be deployed remotely if needed
+
+### Tech Stack
+| Layer | Technology |
+|---|---|
+| Data ingestion | yfinance → IG REST/Streaming API |
+| Strategy & signals | Python package (`trading_lab`) |
+| Backtesting | Custom engine |
+| UI | Streamlit |
+| Broker execution | IG REST API |
+| Live data | IG Streaming API |
+| Storage | Parquet files |
 
 ## Responsibilities
 
