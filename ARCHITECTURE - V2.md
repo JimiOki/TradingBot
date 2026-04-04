@@ -22,6 +22,7 @@
 11. [Testing Strategy](#11-testing-strategy)
 12. [Phase Roadmap Summary](#12-phase-roadmap-summary)
 13. [Anti-Patterns](#13-anti-patterns)
+14. [Architecture Gaps Register](#14-architecture-gaps-register)
 
 ---
 
@@ -225,6 +226,62 @@ Layers communicate via DataFrames passed as arguments and Parquet files on disk.
 
 ---
 
+### 4.2a Context Layer — `src/trading_lab/context/`
+
+**Purpose:** Fetches and caches market context data — economic calendar events and news headlines — that enriches signal explanations and dashboard warnings.
+
+**Owns:**
+- Economic calendar event fetching and caching.
+- News headline fetching per instrument.
+- Graceful degradation: fetch failures are non-blocking; the LLM call proceeds without context if fetches fail.
+
+**Does NOT do:**
+- Generate signals.
+- Block the data refresh pipeline on fetch failure.
+- Write to `data/curated/` or `data/signals/`.
+
+**Key modules:**
+- `economic_calendar.py` — fetches high-impact events from a free RSS source (e.g. Investing.com or ForexFactory RSS). Caches to `data/calendar/events_<date>.json`. Graceful degradation: if fetch fails, returns empty list and logs WARNING.
+- `news.py` — fetches up to 5 recent headlines per instrument from yfinance news feed. Cached alongside signal data. If fetch fails, LLM proceeds without news context.
+
+**Data directories:** `data/calendar/`, `data/news/`
+
+**Note on architecture principle #5 (LLM off the critical path):** News fetch failures are logged at WARNING and the LLM call proceeds without news context. The data refresh script does not fail because of a news fetch failure. Calendar fetch failures are similarly non-blocking.
+
+**Integration point:** Both are called from `scripts/ingest_market_data.py` after price data refresh, before signal generation. Results are passed to the LLM explainer as optional context.
+
+---
+
+### 4.2b Risk Layer — `src/trading_lab/risk/`
+
+**Purpose:** Computes cross-instrument risk metrics. Does not generate signals. Does not place orders.
+
+**Owns:**
+- Pairwise correlation matrix computation across all instruments.
+- `data/risk/correlation.parquet` — recomputed on each data refresh.
+
+**Does NOT do:**
+- Generate signals.
+- Place or approve orders.
+- Read live broker data directly.
+
+**Key module:** `src/trading_lab/risk/correlation.py`
+
+```python
+def compute_pairwise_correlation(
+    curated_data_dir: Path,
+    instrument_list: list[str],
+    window_days: int = 60,
+) -> pd.DataFrame:
+    """Returns a pairwise correlation matrix for the given instruments."""
+```
+
+**Data output:** `data/risk/correlation.parquet` — recomputed on each data refresh.
+
+**Integration:** Called from `scripts/ingest_market_data.py` after price data refresh. Dashboard reads from `data/risk/correlation.parquet` to display correlation warnings.
+
+---
+
 ### 4.3 Strategy Layer — `src/trading_lab/strategies/`
 
 **Purpose:** Produce a signals DataFrame from a curated bars DataFrame.
@@ -241,12 +298,6 @@ Layers communicate via DataFrames passed as arguments and Parquet files on disk.
 - Perform file I/O of any kind inside `generate_signals`.
 - Read environment variables or global state inside `generate_signals`.
 
-**Key modules:**
-- `base.py` — `Strategy` ABC. The `generate_signals` wrapper validates the return contract: `signal` column must exist; values must be in `{-1, 0, 1}`.
-- `sma_cross.py` — `SmaCrossStrategy`. Parameters: `fast_window`, `slow_window`, `rsi_period`, `rsi_overbought`, `rsi_oversold`, `rsi_filter_enabled`.
-- `loader.py` — `load_strategy(config_path)` reads a strategy YAML and returns a configured instance.
-- `runner.py` — `run_signals_for_all_instruments(instruments, strategy)` returns a portfolio-level signal summary DataFrame and writes the snapshot to `data/signals/`.
-
 **Signal contract:**
 
 | Column | Type | Constraints |
@@ -257,6 +308,75 @@ Layers communicate via DataFrames passed as arguments and Parquet files on disk.
 | position_change | int8 | 1 on entry, -1 on exit/reversal, 0 otherwise |
 | fast_sma, slow_sma | float64 | NaN during warmup period |
 | rsi | float64 | Present when RSI filter enabled; NaN during warmup |
+| stop_loss_level | float | ATR-based stop loss price level (NaN for flat signals) |
+| take_profit_level | float | Risk/reward-derived take profit level (NaN for flat signals) |
+| stop_distance | float | Absolute distance from entry to stop (NaN for flat signals) |
+| atr_value | float | ATR(14) value at signal date |
+| confidence_score | int | 0–100 score: base 50 + SMA gap bonus + RSI direction bonus |
+| signal_strength_pct | float | SMA gap as percentage of close price |
+| conflicting_indicators | bool | True when SMA and RSI point in opposite directions |
+| high_volatility | bool | True when ATR(14) > 2× its 30-day rolling average |
+
+**Key modules (updated):**
+- `base.py` — `Strategy` ABC. The `generate_signals` wrapper validates the return contract: `signal` column must exist; values must be in `{-1, 0, 1}`.
+- `sma_cross.py` — `SmaCrossStrategy`. Parameters: `fast_window`, `slow_window`, `rsi_period`, `rsi_overbought`, `rsi_oversold`, `rsi_filter_enabled`. `generate_signals()` must populate all signal contract fields including stop/target/quality fields.
+- `quality.py` — pure functions for `confidence_score`, `signal_strength_pct`, `conflicting_indicators`, `high_volatility`.
+- `loader.py` — `load_strategy(config_path)` reads a strategy YAML and returns a configured instance.
+- `runner.py` — `run_signals_for_all_instruments(instruments, strategy)` returns a portfolio-level signal summary DataFrame and writes the snapshot to `data/signals/`.
+
+**Ownership (extended):** Computes ATR-based stop loss and take profit levels for each non-flat signal using `features/indicators.py:atr()`. Assigns all signal quality fields.
+
+---
+
+### 4.3a Signal Approval Layer — `src/trading_lab/signals/` (Phase 2)
+
+**Purpose:** Manages the lifecycle of signals from generation through operator approval to execution. Monitors open positions for exit conditions on each data refresh.
+
+**Owns:**
+- `SignalStore` — persists signal records to `data/journal/signals.parquet` with status tracking (`pending`, `approved`, `rejected`, `executed`).
+- `SignalRecord` and `SignalStatus` dataclasses.
+- `position_sizer.py` — `calculate_position_size(account_balance, risk_pct, entry_price, stop_loss_price)`.
+- `exit_monitor.py` — evaluates all open positions against exit conditions and writes recommendations to `data/journal/exit_recommendations.parquet`.
+
+**Does NOT do:**
+- Place orders. Approved signals are handed to the Execution Layer.
+- Generate signals. Signals originate from the Strategy Layer.
+
+**Key modules:**
+- `state.py` — `SignalStore`, `SignalRecord`, `SignalStatus`.
+- `position_sizer.py` — pure sizing formula.
+- `exit_monitor.py` — see below.
+
+**New module: `exit_monitor.py`**
+
+Purpose: Evaluates all open positions in `data/journal/trades.parquet` against five exit conditions on each data refresh. Produces `ExitRecommendation` records written to `data/journal/exit_recommendations.parquet`.
+
+Exit conditions evaluated:
+1. Stop loss hit — current price crosses `stop_loss_level`
+2. Take profit hit — current price crosses `take_profit_level`
+3. Opposite signal fired — new signal contradicts open position direction
+4. Signal age exceeded — position open for more than configurable threshold (default 10 days)
+5. RSI extreme — RSI > 80 for a long position, RSI < 20 for a short position
+
+Key interface:
+```python
+@dataclass(frozen=True)
+class ExitRecommendation:
+    symbol: str
+    exit_condition: str  # "stop_hit" | "target_hit" | "opposite_signal" | "signal_age" | "rsi_extreme"
+    current_price: float
+    stop_level: float
+    target_level: float
+    recommended_at: datetime
+
+def evaluate_open_positions(
+    trades_df: pd.DataFrame,
+    signals_df: pd.DataFrame,
+    current_prices: dict[str, float],
+    config: BacktestConfig,
+) -> list[ExitRecommendation]:
+    ...
+```
 
 ---
 
@@ -305,8 +425,42 @@ Layers communicate via DataFrames passed as arguments and Parquet files on disk.
 **Key modules:**
 - `engine.py` — `run_backtest(signals_df, config)`. Execution is assumed at the close of the bar following signal generation (next-bar close with slippage approximation). This is documented in the module docstring.
 - `metrics.py` — `compute_metrics(equity_curve, trades, config) -> BacktestResult`. Metrics undefined by insufficient trades return `None`, not zero.
-- `models.py` — `BacktestConfig` and `BacktestResult` dataclasses.
+- `models.py` — `BacktestConfig` and `BacktestResult` dataclasses. `BacktestConfig` requires the following additional fields:
+  - `mode: Literal["in_sample", "out_of_sample", "full"]`
+  - `oos_ratio: float = 0.3` (used when mode is `"full"` to auto-split)
+  - `parameters_locked: bool = False` (set to True after in_sample run; prevents re-tuning)
 - `reporter.py` — `save_backtest_result(result, config, trade_log, output_dir)`.
+- `validation.py` — implements in-sample / out-of-sample data splitting and strategy approval thresholds (see below).
+
+**New module: `validation.py`**
+
+Purpose: Implements in-sample / out-of-sample data splitting and strategy approval thresholds.
+
+Key functions:
+```python
+def split_in_sample_out_of_sample(
+    bars_df: pd.DataFrame,
+    oos_ratio: float = 0.3,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Returns (in_sample_df, out_of_sample_df). Split is always chronological."""
+
+def validate_oos_thresholds(
+    result: BacktestResult,
+    min_sharpe: float = 0.5,
+    max_drawdown_pct: float = 25.0,
+) -> ValidationResult:
+    """Returns APPROVED or NOT_APPROVED with reason."""
+
+def compute_performance_degradation(
+    in_sample_result: BacktestResult,
+    oos_result: BacktestResult,
+) -> float:
+    """Returns degradation as a percentage. >50% triggers overfitting warning."""
+```
+
+**Backtest artefact naming for IS/OOS runs:**
+- In-sample artefacts: `<symbol>_<timeframe>_<strategy>_<timestamp>_in_sample_summary.json`
+- Out-of-sample artefacts: `<symbol>_<timeframe>_<strategy>_<timestamp>_out_of_sample_summary.json`
 
 ---
 
@@ -584,6 +738,7 @@ IG Streaming API
 | `data/signals/explanations/` | LLM explanation JSON cache | `ExplanationService` | Dashboard |
 | `data/backtests/` | Summary JSON + trades Parquet | `backtesting/reporter.py` | Dashboard (backtests page) |
 | `data/journal/` | Signal and trade lifecycle records | `SignalStore`, `IgBrokerAdapter` | Dashboard (journal page) |
+| `data/journal/exit_recommendations.parquet` | Exit recommendations from `exit_monitor.py` | `exit_monitor.py` | Dashboard (journal page) |
 | `data/live/` | IG Streaming candle data | `ig_streaming.py` | Dashboard (positions panel) |
 
 ### File naming standards
@@ -619,10 +774,10 @@ Timezone rule: timestamps are always stored as UTC-aware `datetime64[ns, UTC]`. 
 ### Backtest in-sample / out-of-sample convention
 
 When a backtest is split for validation purposes:
-- In-sample file: `<symbol>_<tf>_<strategy>_<utc_ts>_IS_summary.json`
-- Out-of-sample file: `<symbol>_<tf>_<strategy>_<utc_ts>_OOS_summary.json`
+- In-sample artefacts: `<symbol>_<timeframe>_<strategy>_<timestamp>_in_sample_summary.json`
+- Out-of-sample artefacts: `<symbol>_<timeframe>_<strategy>_<timestamp>_out_of_sample_summary.json`
 
-The split ratio is stored in the strategy YAML as `oos_ratio` (e.g. `0.2` = last 20% of the date range is OOS). If no split is configured, a single summary file without the `_IS`/`_OOS` suffix is written.
+The split ratio is stored in `BacktestConfig.oos_ratio` (default `0.3` = last 30% of the date range is OOS) and also in the strategy YAML as `oos_ratio`. If no split is configured (`mode = "full"` with no auto-split), a single summary file without the `_in_sample`/`_out_of_sample` suffix is written. The `validation.py` module in the Backtesting Layer enforces chronological splitting and approval thresholds.
 
 ---
 
@@ -831,7 +986,7 @@ testpaths = ["tests"]
 addopts = "--tb=short"
 ```
 
-Coverage is reported with `pytest-cov`. The target is 100% coverage of functions in `features/`, `strategies/`, and `backtesting/`.
+Coverage is reported with `pytest-cov`. The target is 100% coverage of critical paths: signal generation pipeline, backtest engine core loop, cost application, no-lookahead enforcement, position sizing formula, OOS validation thresholds. 80% overall line coverage target. Coverage is measured by pytest-cov and reported on each test run.
 
 ---
 
@@ -854,6 +1009,13 @@ Coverage is reported with `pytest-cov`. The target is 100% coverage of functions
 **Exit criteria:** 30 days of stable paper trading on the IG demo account with no critical defects. All Phase 2 tests pass. Order audit log reviewed. Kill switch tested on demo.
 
 **Live capital at risk:** None. Demo account only.
+
+**Notifications (Phase 2):** `src/trading_lab/notifications/`
+- `notifier.py` — abstract `Notifier` base class with `send(title, body)` method.
+- `ntfy_notifier.py` — concrete implementation using ntfy.sh (free, no account required).
+- `pushover_notifier.py` — alternative implementation using Pushover.
+- Configuration in `config/environments/local.yaml`: `notifications.enabled`, `notifications.provider`, `notifications.topic`.
+- Triggered by: new signal fired, CLOSE recommendation generated.
 
 ---
 
@@ -890,3 +1052,23 @@ The following patterns are explicitly rejected. Code reviews should treat any in
 **Hardcoded magic numbers in business logic.** Annualisation constants (`252`, `52`), data quality thresholds (`5%` null close limit), and risk parameters must be named constants or config values, not inline literals. A search-replace must not be required to change a threshold.
 
 **Partial result writes.** Backtest summaries, trade journals, and curated files are written atomically: to a temp file first, then renamed. A failed run must not leave a partial or truncated file that downstream code treats as valid.
+
+---
+
+## 14. Architecture Gaps Register
+
+A living register of known gaps and their resolution status. Update this section as gaps are closed.
+
+| ID | Gap | Status | Resolution |
+|---|---|---|---|
+| GAP-001 | BacktestConfig missing symbol/timeframe/date range | Open | Add fields before Phase 1 backtest work |
+| GAP-002 | No tests/ directory | Open | Create in first Phase 1 step |
+| GAP-003 | Signal contract not validated in base class | Open | Add post-call validation to Strategy ABC |
+| GAP-004 | Engine clips signal=-1 to 0 | Open | Fix before any short-side backtest |
+| GAP-005 | adjusted flag absent from curated Parquet | Open | Fix in transforms.py |
+| GAP-006 | backtrader in dependencies | Open | Remove from pyproject.toml |
+| GAP-007 | instruments.yaml contains SPY not commodities | Open | Replace with Phase 1 instruments |
+| GAP-008 | No structured logging | Open | Add to all scripts and ingest pipeline |
+| GAP-009 | polars and scikit-learn in dependencies | Open | Remove from pyproject.toml |
+| GAP-010 | IG epic mapping missing from instruments.yaml | Phase 2 prereq | Add before Phase 2 begins |
+| GAP-011 | Signal persistence not implemented | Open | Implement data/signals/ write in Phase 1 |

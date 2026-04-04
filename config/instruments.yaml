@@ -1,7 +1,58 @@
+# Phase 1 instruments — commodities via yfinance
+# ig_epic fields are placeholders — populate before Phase 2
+
 instruments:
-  - symbol: SPY
-    asset_type: etf
+  - symbol: "GC=F"
+    name: Gold
+    asset_class: commodity
     timeframe: 1d
     source: yfinance
     session_timezone: America/New_York
-    adjusted_prices: true
+    session_open: "18:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: null  # TODO: populate before Phase 2
+
+  - symbol: "CL=F"
+    name: Crude Oil (WTI)
+    asset_class: commodity
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "18:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: null  # TODO: populate before Phase 2
+
+  - symbol: "SI=F"
+    name: Silver
+    asset_class: commodity
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "18:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: null  # TODO: populate before Phase 2
+
+  - symbol: "HG=F"
+    name: Copper
+    asset_class: commodity
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "18:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: null  # TODO: populate before Phase 2
+
+  - symbol: "NG=F"
+    name: Natural Gas
+    asset_class: commodity
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "18:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: null  # TODO: populate before Phase 2

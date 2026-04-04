@@ -8,17 +8,17 @@ version = "0.1.0"
 description = "Local research and execution environment for systematic trading."
 requires-python = ">=3.11"
 dependencies = [
-  "backtrader",
-  "ipykernel",
-  "jupyterlab",
+  "anthropic",
   "matplotlib",
   "numpy",
   "pandas",
-  "polars",
+  "plotly",
   "pyarrow",
+  "pytest",
+  "pytest-cov",
   "python-dotenv",
   "requests",
-  "scikit-learn",
+  "streamlit",
   "ta",
   "yfinance",
 ]
@@ -38,3 +38,14 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--cov=src/trading_lab --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["src/trading_lab"]
+omit = ["*/tests/*", "*/__init__.py"]

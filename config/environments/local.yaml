@@ -1,7 +1,39 @@
-default_data_source: yfinance
-timezone: UTC
+# Local environment configuration
+# Secrets (API keys, credentials) live in .env — never here
+
+environment: demo  # demo | live — controls IG adapter endpoint
+
 data_root: data
-raw_data_dir: data/raw
-curated_data_dir: data/curated
-features_data_dir: data/features
-backtest_results_dir: data/backtests
+
+directories:
+  raw: data/raw
+  curated: data/curated
+  features: data/features
+  signals: data/signals
+  explanations: data/signals/explanations
+  backtests: data/backtests
+  journal: data/journal
+  calendar: data/calendar
+  news: data/news
+  risk: data/risk
+  logs: logs
+
+capital:
+  initial_cash: 100000
+  risk_per_trade_pct: 1.0  # % of capital risked per trade
+  max_open_positions: 3
+  daily_loss_limit_pct: 3.0
+
+llm:
+  provider: claude
+  model: claude-opus-4-6
+  max_tokens: 500
+  enabled: true
+
+notifications:
+  enabled: false
+  provider: ntfy  # ntfy | pushover
+  topic: trading-lab-signals
+
+timezone: UTC
+default_timeframe: 1d
