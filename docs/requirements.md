@@ -1910,6 +1910,372 @@ REQ-FX-001 (forex instruments)
 
 ---
 
+---
+
+## 11. Market Context Engine
+
+### Objective
+
+Define a new component responsible for aggregating non-technical, contextual inputs (sentiment, news, economic events, commodity-specific events) and producing a structured output that downstream components — primarily the LLM explainer and decision layer — can consume. This component does not generate signals, does not compute composite scores, and does not override strategy logic.
+
+---
+
+### 11.1 Market Context Engine Component
+
+#### REQ-CONTEXT-001 — Engine definition and boundaries
+
+**Requirement:** A `MarketContextEngine` class must exist in `src/trading_lab/context/engine.py`. It is responsible solely for aggregating contextual inputs and returning a structured `MarketContext` object. It has no dependency on strategy or backtest code.
+
+**Acceptance criteria:**
+- `MarketContextEngine` exposes a single public method: `build_context(symbol: str, as_of_date: date) -> MarketContext`.
+- The method aggregates all available context sources defined in this section for the given instrument and date.
+- The method returns a `MarketContext` object (REQ-CONTEXT-002); it never returns raw text, a dict of strings, or an unstructured blob.
+- `MarketContextEngine` does not call strategy methods, read signal files, or write to `data/signals/`. Its output path is `data/context/` only.
+- A unit test confirms that `build_context` can be called with a mocked data layer (no network calls) and returns a fully populated `MarketContext` without error.
+- The engine does not compute a composite sentiment score. It aggregates raw inputs; score computation is explicitly out of scope for this component.
+
+**Assumption A-026:** The Market Context Engine is called as part of the daily data refresh pipeline, after price data has been ingested but before LLM explanation is generated. It is not called at dashboard render time.
+
+---
+
+#### REQ-CONTEXT-002 — MarketContext output schema
+
+**Requirement:** The `MarketContext` object must be a typed dataclass (or Pydantic model) conforming to a fixed schema. All fields must be typed; no raw text strings or untyped dicts are permitted at the top level.
+
+**Acceptance criteria:**
+- `MarketContext` contains the following top-level fields:
+  - `symbol: str` — the instrument identifier.
+  - `as_of_date: date` — the date for which context was assembled.
+  - `fetch_timestamp: datetime` — UTC timestamp of when the context was assembled.
+  - `news_events: list[ContextEvent]` — news headlines (see REQ-EVENT-001 for `ContextEvent` schema).
+  - `macro_events: list[ContextEvent]` — scheduled economic calendar events relevant to this instrument.
+  - `commodity_events: list[ContextEvent]` — commodity-specific events (EIA inventory, OPEC meetings, China PMI).
+  - `ig_sentiment: IGSentiment | None` — IG client sentiment data (see REQ-SENT-001); `None` if unavailable.
+  - `event_freshness: EventFreshness` — metadata about event age across all three event lists (see REQ-EVENT-001).
+- A `MarketContext` can be serialised to and deserialised from JSON without loss of typing information.
+- A unit test verifies round-trip serialisation: a `MarketContext` serialised to JSON and deserialised produces an object equal to the original.
+
+---
+
+#### REQ-CONTEXT-003 — Market context persistence
+
+**Requirement:** The assembled `MarketContext` must be written to disk as part of the daily refresh pipeline so that the LLM and dashboard can read it without triggering a re-fetch.
+
+**Acceptance criteria:**
+- Context is written to `data/context/<symbol>_<YYYY-MM-DD>.json` using the `as_of_date` field.
+- The file is written only after the `MarketContext` object has been fully assembled and validated; a partial write does not leave a file at the final path.
+- A subsequent refresh for the same symbol and date overwrites the existing file and logs the overwrite at `INFO` level.
+- Context files are excluded from version control via `.gitignore`.
+- The LLM explainer reads from this file rather than triggering a new context fetch; it raises a `ContextNotAvailableError` if the file is absent, which triggers graceful degradation (explanation proceeds without context, logged at `WARNING`).
+
+---
+
+### 11.2 Event Freshness and Classification
+
+#### Objective
+
+Every event ingested by the Market Context Engine must be tagged with structured metadata so that consuming components can filter, sort, and distinguish events by type, recency, and relevance without parsing free text.
+
+---
+
+#### REQ-EVENT-001 — Event tagging schema
+
+**Requirement:** Every event included in a `MarketContext` must conform to the `ContextEvent` schema with all required fields populated at ingestion time.
+
+**Acceptance criteria:**
+- `ContextEvent` is a typed dataclass containing:
+  - `title: str` — headline or event name.
+  - `source: str` — publisher or data provider name (e.g. `"Yahoo Finance"`, `"EIA"`, `"Investing.com"`).
+  - `event_timestamp: datetime` — UTC datetime of the event or publication. Must be timezone-aware.
+  - `event_type: Literal["macro", "supply", "geopolitical", "central_bank", "commodity_inventory", "sentiment", "news"]` — classification of the event.
+  - `relevance: list[str]` — list of instrument symbols for which this event is considered relevant (e.g. `["GC=F", "SI=F"]`).
+  - `is_scheduled: bool` — `True` if the event was pre-announced on an economic calendar; `False` for breaking news or unscheduled publications.
+- An `EventFreshness` object contains:
+  - `oldest_event_age_days: float` — age in calendar days of the oldest event in the combined event lists.
+  - `newest_event_age_days: float` — age in calendar days of the most recent event.
+  - `total_event_count: int` — total number of events across all three lists.
+- `time_since_event` is not stored statically; it is computed at the point of use as `(current_datetime - event_timestamp).total_seconds() / 86400`.
+- A unit test verifies that a `ContextEvent` constructed with a naive datetime raises a `ValueError`.
+
+---
+
+#### REQ-EVENT-002 — Scheduled vs unscheduled event classification
+
+**Requirement:** Events sourced from an economic calendar (REQ-CTX-001) must be classified as `is_scheduled=True`. Events sourced from news headline feeds (REQ-LLM-008) must be classified as `is_scheduled=False`.
+
+**Acceptance criteria:**
+- The ingestion path for economic calendar events (Investing.com feed or equivalent) sets `is_scheduled=True` on all produced `ContextEvent` objects.
+- The ingestion path for yfinance news headlines sets `is_scheduled=False` on all produced `ContextEvent` objects.
+- A unit test confirms that a `ContextEvent` produced by the calendar ingestion path has `is_scheduled=True`, and one produced by the news path has `is_scheduled=False`.
+- The `is_scheduled` field is included in the serialised JSON output.
+
+---
+
+#### REQ-EVENT-003 — Stale and duplicate event suppression
+
+**Requirement:** The Market Context Engine must not include stale or duplicate events in the assembled `MarketContext`.
+
+**Acceptance criteria:**
+- An event is considered stale if `time_since_event > STALE_EVENT_THRESHOLD_DAYS`. `STALE_EVENT_THRESHOLD_DAYS` defaults to 5 and is defined as a named constant in `context/engine.py`, not a magic number.
+- Stale events are excluded before the `MarketContext` is assembled. The count of excluded stale events is logged at `DEBUG` level.
+- A duplicate event is defined as two events with the same `title` (case-insensitive, stripped of leading/trailing whitespace) and the same `event_timestamp` (to the nearest minute). Only the first occurrence is retained.
+- The deduplication step runs after staleness filtering and before the `MarketContext` is constructed.
+- A unit test verifies: given two events with identical `title` and `event_timestamp`, the assembled context contains exactly one of them.
+- A unit test verifies: an event with `time_since_event = 6` days is excluded when `STALE_EVENT_THRESHOLD_DAYS = 5`.
+
+---
+
+### 11.3 IG Client Sentiment Integration
+
+#### Objective
+
+Ingest IG client sentiment data — the percentage of IG retail clients holding long and short positions on each instrument — and make it available as structured positioning data in the `MarketContext`. This data represents retail client positioning only and must never be described as full market sentiment or used as a directional signal.
+
+---
+
+#### REQ-SENT-001 — IG client sentiment ingestion
+
+**Requirement:** The system must fetch IG client sentiment data for each instrument in the watchlist via the IG REST API client sentiment endpoint and produce a structured `IGSentiment` object.
+
+**Acceptance criteria:**
+- The IG sentiment endpoint (`GET /clientsentiment?marketIds=<epic>`) is called using the authenticated IG session established by REQ-IG-001. No additional authentication is required.
+- `IGSentiment` is a typed dataclass containing:
+  - `market_id: str` — the IG epic identifier for the instrument.
+  - `long_position_pct: float` — percentage of IG clients holding long positions (0–100).
+  - `short_position_pct: float` — percentage of IG clients holding short positions (0–100).
+  - `long_pct_daily_change: float | None` — change in `long_position_pct` versus the previous day's value; `None` if unavailable.
+  - `short_pct_daily_change: float | None` — change in `short_position_pct` versus the previous day's value; `None` if unavailable.
+  - `fetch_timestamp: datetime` — UTC timestamp of when the data was fetched.
+- `long_position_pct + short_position_pct` must equal 100 (within a floating-point tolerance of 0.1). If the API returns values that violate this, a `DataQualityError` is raised and the `IGSentiment` field in `MarketContext` is set to `None`.
+- If the IG API is unavailable or returns an error for sentiment, `ig_sentiment` is set to `None` in the `MarketContext`. The context assembly proceeds without it; the absence is logged at `WARNING` level.
+- A unit test verifies that sentiment is set to `None` when the API returns an HTTP error, without propagating the exception.
+
+**Assumption A-027:** IG client sentiment data is available for all five Phase 1 commodity instruments via the IG API. If an instrument has no sentiment data (e.g. because it is not widely traded by IG retail clients), `ig_sentiment` is `None` and the system proceeds without it.
+
+---
+
+#### REQ-SENT-002 — Sentiment classification constraint
+
+**Requirement:** IG client sentiment data must be labelled as retail client positioning in all contexts where it is displayed or passed to the LLM. It must not be presented as a directional market indicator.
+
+**Acceptance criteria:**
+- In the `MarketContext` schema and all serialised outputs, the sentiment data block is labelled `ig_client_sentiment`, not `market_sentiment` or `sentiment_signal`.
+- In the LLM prompt template, the sentiment data is introduced with the phrase: `"IG retail client positioning (note: this reflects IG retail clients only, not the full market)"` — not `"market sentiment"` or `"sentiment indicator"`.
+- The dashboard, if it displays sentiment data, labels it `IG Client Positioning` not `Market Sentiment`.
+- A code review check (documented in `docs/conventions.md` or equivalent) prohibits use of the string `"market sentiment"` when referring to IG client positioning data.
+
+---
+
+#### REQ-SENT-003 — Sentiment persistence
+
+**Requirement:** IG client sentiment data must be fetched during the daily data refresh and stored in the `MarketContext` cache. It must not be re-fetched at dashboard render time.
+
+**Acceptance criteria:**
+- `IGSentiment` data is written as part of the `MarketContext` JSON file (REQ-CONTEXT-003) and is therefore cached with the same lifecycle as other context data.
+- The dashboard reads `IGSentiment` from the cached `MarketContext` file; it does not make a direct call to the IG sentiment endpoint.
+- The `fetch_timestamp` on the `IGSentiment` object reflects when the data was retrieved during the refresh, not when it is read by the dashboard.
+
+---
+
+### 11.4 Structured Model Context
+
+#### Objective
+
+Define the schema extension that encapsulates all inputs passed to the LLM for both explanation and decision outputs. All fields must be structured and typed. Raw text dumps, unstructured string concatenations, and untyped dicts are prohibited as LLM inputs.
+
+---
+
+#### REQ-MCTX-001 — Structured model context schema
+
+**Requirement:** All data passed to the LLM must be encapsulated in a `ModelContext` typed object. `ModelContext` extends the existing `SignalContext` (REQ-LLM-002) with fields from the `MarketContext` (REQ-CONTEXT-002).
+
+**Acceptance criteria:**
+- `ModelContext` is a typed dataclass containing:
+  - `price_context: PriceContext` — a sub-object containing: `signal_direction` (LONG/SHORT/FLAT), `confidence_score` (int or None), `signal_strength_pct` (float or None), `conflicting_indicators` (bool), `high_volatility` (bool), `fast_sma` (float), `slow_sma` (float), `rsi` (float), `close_price` (float), `stop_loss_level` (float or None), `take_profit_level` (float or None), `risk_reward_ratio` (float or None).
+  - `positioning: IGSentiment | None` — IG client sentiment (from REQ-SENT-001); `None` if unavailable.
+  - `macro_events: list[ContextEvent]` — macro and central bank events from `MarketContext`.
+  - `news_events: list[ContextEvent]` — news headlines from `MarketContext`.
+  - `commodity_events: list[ContextEvent]` — commodity-specific events from `MarketContext`.
+  - `event_freshness: EventFreshness` — event age metadata from `MarketContext`.
+- The LLM prompt builder serialises `ModelContext` to a structured format (e.g. nested JSON or clearly labelled sections) before constructing the prompt string. It does not pass raw field values as unstructured prose.
+- The LLM prompt builder does not accept a raw `DataFrame`, a plain `dict`, or a free-text string as its primary input. It accepts only a `ModelContext` object.
+- A unit test verifies that constructing a `ModelContext` with a `None` `price_context` raises a `TypeError` at construction time.
+
+**Assumption A-028:** `ModelContext` is constructed by composing the signal output (from `SignalContext`) and the persisted `MarketContext` file. If the `MarketContext` file is absent, the `macro_events`, `news_events`, `commodity_events`, and `positioning` fields are set to empty lists / `None`, and the LLM proceeds with price context only. This is the graceful-degradation path.
+
+---
+
+#### REQ-MCTX-002 — Structured model context validation gate
+
+**Requirement:** Before the `ModelContext` is passed to any LLM call, a validation step must confirm that the mandatory fields are populated. LLM calls with incomplete mandatory context are blocked.
+
+**Acceptance criteria:**
+- A `validate_model_context(ctx: ModelContext) -> None` function raises a `ModelContextValidationError` if any of the following fields are `None` or empty: `price_context`, `price_context.signal_direction`, `price_context.close_price`.
+- `macro_events`, `news_events`, `commodity_events`, and `positioning` may be empty lists or `None` without triggering the error; their absence is handled by REQ-MCTX-001's degradation path.
+- The validation function is called immediately before every LLM API invocation; it is not optional.
+- A unit test verifies that a `ModelContext` with `price_context=None` causes `ModelContextValidationError` to be raised by the validator.
+
+---
+
+### 11.5 LLM Decision Role Extension
+
+#### Objective
+
+Extend the LLM's role beyond producing a plain English explanation (REQ-LLM-003) to also outputting a structured trade recommendation. The system remains fully discretionary: the LLM recommendation requires explicit user approval before any action is taken.
+
+---
+
+#### REQ-LLMDEC-001 — LLM decision output contract
+
+**Requirement:** In addition to the explanation string (REQ-LLM-003), the LLM must return a structured `LLMDecision` object containing a trade direction recommendation and supporting parameters.
+
+**Acceptance criteria:**
+- `LLMDecision` is a typed dataclass containing:
+  - `direction: Literal["LONG", "SHORT", "NONE"]` — the LLM's recommended trade direction. `NONE` is a valid and expected outcome.
+  - `stop_loss: float | None` — LLM-suggested stop loss level; may differ from ATR-based stop (REQ-SL-001). `None` if `direction` is `NONE`.
+  - `take_profit: float | None` — LLM-suggested take profit level. `None` if `direction` is `NONE`.
+  - `confidence: int` — LLM confidence in the direction recommendation, in the range 0–100.
+  - `position_size_multiplier: Literal[0.25, 0.5, 0.75, 1.0]` — suggested scaling of the calculated position size (REQ-RISK-004). `NONE` direction must produce a multiplier of `0.25` or lower, not `1.0`.
+  - `rationale: str` — one sentence explaining why the LLM chose this direction over alternatives.
+- The LLM is instructed (via the prompt template) to return a JSON block conforming to the `LLMDecision` schema in addition to the plain English explanation. The JSON block and the explanation are returned in the same response.
+- The prompt template instructs the LLM that `NONE` is the correct direction when evidence is mixed, stale, or insufficient, and that `NONE` is preferable to a low-confidence directional call.
+- The prompt template is stored in a dedicated file or config location, consistent with REQ-LLM-003's prompt storage requirement.
+
+**Assumption A-029:** The LLM's `stop_loss` and `take_profit` values are advisory outputs derived from the model's qualitative assessment of the context. They do not replace the ATR-based values from REQ-SL-001 and REQ-SL-002. Both sets of values are displayed to the user; the ATR-based values remain the default for position sizing.
+
+---
+
+#### REQ-LLMDEC-002 — Structured decision response parsing
+
+**Requirement:** The system must parse the `LLMDecision` JSON block from the LLM response. If parsing fails, the system must degrade gracefully without surfacing an error to the user.
+
+**Acceptance criteria:**
+- The response parser extracts the JSON block from the LLM response and deserialises it into an `LLMDecision` object.
+- If the JSON block is absent, malformed, or fails schema validation, the parser returns a default `LLMDecision` with `direction="NONE"`, `confidence=0`, `position_size_multiplier=0.25`, and `rationale="LLM decision unavailable."`. It does not raise an exception.
+- The parse failure is logged at `WARNING` level with the raw response excerpt (truncated to 200 characters) for diagnostics.
+- The explanation string is still returned even when decision parsing fails; the two outputs are independent.
+- A unit test simulates a malformed JSON block in the LLM response and confirms the default `LLMDecision` is returned without raising an exception.
+
+---
+
+#### REQ-LLMDEC-003 — Discretionary constraint preserved
+
+**Requirement:** The LLM decision output must not trigger any automated action. All LLM direction recommendations remain advisory; user approval is required before any order is placed.
+
+**Acceptance criteria:**
+- No code path exists in which an `LLMDecision` with `direction="LONG"` or `direction="SHORT"` directly initiates an order submission without passing through the approval workflow (REQ-APPROVE-001 and REQ-APPROVE-002).
+- The dashboard displays the LLM decision as a recommendation card, not as a pending order.
+- The confirm modal (REQ-APPROVE-002) shows the LLM decision alongside the technical signal; the user retains full control over whether to approve.
+- An automated test confirms that calling `place_order` directly from a `LLMDecision` object raises an `AuthorisationError` — i.e. no such direct call path exists in the codebase.
+
+---
+
+#### REQ-LLMDEC-004 — LLM vs technical signal comparison and conflict display
+
+**Requirement:** When the LLM direction contradicts the technical signal direction, the conflict must be displayed prominently. The system must not silently resolve or suppress the disagreement.
+
+**Acceptance criteria:**
+- A conflict is defined as: technical signal is `LONG` and LLM direction is `SHORT` or `NONE`; or technical signal is `SHORT` and LLM direction is `LONG` or `NONE`.
+- When a conflict exists, the dashboard displays a `LLM/SIGNAL CONFLICT` warning card for that instrument, showing both directions side-by-side: e.g. `Technical: LONG | LLM: NONE`.
+- The conflict flag is stored as a boolean field `llm_signal_conflict` in the signal cache (alongside `LLMDecision`) so it can be read on subsequent dashboard loads without re-evaluation.
+- The LLM rationale for its direction is always displayed in the conflict card, regardless of confidence score.
+- A unit test verifies that a technical signal of `LONG` and an LLM direction of `NONE` produces `llm_signal_conflict=True`.
+
+---
+
+### 11.6 Guardrails
+
+#### Objective
+
+Define explicit constraints that prevent the system from surfacing low-quality or poorly-supported signals for user action, while ensuring that conflicts and uncertainties are visible rather than suppressed.
+
+---
+
+#### REQ-GUARD-001 — "No trade" is a valid and first-class outcome
+
+**Requirement:** The system must treat a "no trade" recommendation — whether from the LLM (REQ-LLMDEC-001) or from guardrail evaluation — as a substantive, displayable outcome, not as an absence of output or a system error.
+
+**Acceptance criteria:**
+- An LLM decision of `direction="NONE"` is displayed in the dashboard with the same visual weight as `LONG` or `SHORT`, including the rationale and confidence score.
+- A signal that is blocked by a guardrail (REQ-GUARD-002 or REQ-GUARD-003) is displayed with a `BLOCKED` status and the specific guardrail reason. It is not silently hidden.
+- `BLOCKED` signals are included in the signal history (REQ-JOURNAL-002) with a `block_reason` field populated.
+- A unit test verifies that a signal blocked by REQ-GUARD-002 appears in the signal history with `status="blocked"` and a non-null `block_reason`.
+
+---
+
+#### REQ-GUARD-002 — Price confirmation gate
+
+**Requirement:** A signal must not be surfaced for user approval unless it passes a minimum price confirmation check, ensuring the technical evidence for the signal is present and measurable.
+
+**Acceptance criteria:**
+- A signal passes price confirmation if both of the following are true: `signal_strength_pct > 0` (the SMA gap is non-zero) AND `confidence_score >= 50` (REQ-QUAL-001).
+- Signals that fail this check are assigned `status="blocked"` with `block_reason="price_confirmation_failed"`. They are displayed in the dashboard with a `BLOCKED` badge but are not shown in the pending approval queue.
+- `PRICE_CONFIRMATION_MIN_STRENGTH` (0) and `PRICE_CONFIRMATION_MIN_CONFIDENCE` (50) are defined as named constants; they are not magic numbers.
+- A unit test verifies: `signal_strength_pct=0.5` and `confidence_score=75` → passes; `signal_strength_pct=0.5` and `confidence_score=25` → blocked; `signal_strength_pct=0.0` and `confidence_score=100` → blocked.
+
+---
+
+#### REQ-GUARD-003 — Event freshness gate
+
+**Requirement:** A signal must not be surfaced for user approval if all available context events are stale (i.e. older than `STALE_EVENT_THRESHOLD_DAYS` from REQ-EVENT-003) AND no `IGSentiment` data is available. When fresh context is absent, the signal is shown with a warning, not blocked outright.
+
+**Acceptance criteria:**
+- If `event_freshness.total_event_count = 0` OR `event_freshness.newest_event_age_days >= STALE_EVENT_THRESHOLD_DAYS`, AND `ig_sentiment` is `None`, the dashboard displays a `STALE CONTEXT` warning banner on the signal card: `"No recent events available for this instrument. Signal context may not reflect current conditions."`.
+- The `STALE CONTEXT` warning does not block the signal from appearing in the approval queue; it is advisory only. The user may still approve or reject.
+- If fresh sentiment data (`ig_sentiment` is not `None`) is available, the `STALE CONTEXT` warning is suppressed even if all events are stale, since sentiment data provides some current positioning context.
+- The stale context check uses `STALE_EVENT_THRESHOLD_DAYS` from REQ-EVENT-003; it is not a separately defined constant.
+- A unit test verifies: `total_event_count=0` and `ig_sentiment=None` → warning displayed; `total_event_count=0` and `ig_sentiment` populated → no warning.
+
+---
+
+#### REQ-GUARD-004 — Conflicting signals must be surfaced, not suppressed
+
+**Requirement:** When multiple conflict conditions exist simultaneously on the same instrument, all active conflicts must be displayed. No conflict may be hidden because another conflict is already visible.
+
+**Acceptance criteria:**
+- The following conflict types are independently tracked and displayed:
+  1. `conflicting_indicators` — technical indicators disagree (REQ-QUAL-003).
+  2. `llm_signal_conflict` — LLM direction contradicts technical signal (REQ-LLMDEC-004).
+  3. `high_volatility` — ATR spike warning (REQ-QUAL-004).
+- All active conflict flags are stored in the signal cache as separate boolean fields.
+- The dashboard renders each conflict as a separate badge or warning line on the signal card. A signal card with three active conflicts displays three visible warnings; they are not collapsed into a single generic warning.
+- The confirmation modal (REQ-APPROVE-002) also surfaces all active conflict warnings before the user confirms an order.
+- A unit test verifies that a signal with all three conflict flags set to `True` produces three distinct warning entries in the rendered signal card data structure.
+
+---
+
+### 11.7 Data Cost Constraint
+
+#### Objective
+
+Constrain the Market Context Engine and all supporting data integrations to free or low-cost data sources. The system must not introduce dependencies on paid data providers without an explicit decision and documentation.
+
+---
+
+#### REQ-COST-001 — Free and low-cost data sources only
+
+**Requirement:** All data sources used by the Market Context Engine (section 11) and by the LLM explanation subsystem (section 3.7) must be free or accessible via the existing IG account subscription. No additional paid data service may be introduced without an explicit decision record.
+
+**Acceptance criteria:**
+- The following sources are explicitly permitted:
+  - IG REST API (client sentiment, market data, open positions) — covered by existing IG account.
+  - yfinance (price OHLCV, news headlines via `Ticker.news`) — free, no auth.
+  - Investing.com RSS feed or equivalent free economic calendar (as specified in REQ-CTX-001) — free, no auth.
+  - EIA public data API (e.g. `https://api.eia.gov`) — free, requires free registration key stored in `.env`.
+  - OPEC public website data (scraped or RSS where available) — free, no subscription.
+- The following sources are explicitly prohibited:
+  - Reuters Eikon / Refinitiv Elektron API.
+  - Bloomberg Terminal API or Bloomberg Data License.
+  - Quandl premium datasets (free Quandl datasets are permitted if relevant).
+  - Any service with a per-call cost or a monthly subscription fee above £0, unless already covered by the existing IG account.
+- A `config/data_sources.yaml` file documents each active data source, its cost classification (`free` / `ig_included` / `paid_excluded`), and the environment variable or config key used to access it.
+- Any attempt to add a new data source to the Market Context Engine must include an update to `config/data_sources.yaml` as part of the same change. A CI check (or pre-commit hook) verifies this file exists and is valid YAML before merging.
+- A unit test confirms that `config/data_sources.yaml` contains no entry with `cost_classification: paid` (which would indicate a paid source has been introduced in violation of this requirement).
+
+**Assumption A-030:** The EIA API free registration key has no usage cost and provides sufficient data for Phase 1 commodity inventory data (crude oil, natural gas). If EIA imposes fees, it must be removed from the permitted list and `config/data_sources.yaml` updated.
+
+---
+
 *End of Trading Lab Requirements — v2.0*
 *Supersedes: `docs/requirements-phase1.md`*
 
