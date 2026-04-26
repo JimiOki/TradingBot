@@ -1,9 +1,10 @@
 # Trading Lab — Architecture and Build Plan
 
 **Status:** Active
-**Date:** 2026-04-03
+**Date:** 2026-04-26
 **Author:** Solution Architect
-**Informed by:** `docs/requirements.md`, codebase audit (2026-04-03)
+**Supersedes:** previous build-plan.md (2026-04-03)
+**Informed by:** `docs/requirements.md` (including Section 11 additions, 2026-04-25), codebase audit (2026-04-26)
 
 ---
 
@@ -11,668 +12,617 @@
 
 1. [Current State Assessment](#1-current-state-assessment)
 2. [Target Architecture](#2-target-architecture)
-3. [LLM Integration Design](#3-llm-integration-design)
-4. [Phase 1 Build Order](#4-phase-1-build-order)
-5. [Phase 2 Build Order](#5-phase-2-build-order)
-6. [Phase 3 Build Order](#6-phase-3-build-order)
-7. [Interface Definitions](#7-interface-definitions)
-8. [Configuration Design](#8-configuration-design)
-9. [Testing Strategy](#9-testing-strategy)
-10. [Risks and Mitigations](#10-risks-and-mitigations)
+3. [Phase 1 — Remaining Work](#3-phase-1--remaining-work)
+4. [Phase 2 — IG Demo Account](#4-phase-2--ig-demo-account)
+5. [Phase 3 — IG Live Account](#5-phase-3--ig-live-account)
+6. [Interface Definitions](#6-interface-definitions)
+7. [Configuration Design](#7-configuration-design)
+8. [Testing Strategy](#8-testing-strategy)
 
 ---
 
 ## 1. Current State Assessment
 
-### What Exists
+### What Is Built and Working
 
-The codebase has a functional skeleton for data ingestion, signal generation, and backtesting. The module boundaries are correct and the directory structure maps cleanly to the intended architecture. The following components work:
+The core research pipeline is functionally complete. The following modules exist and are implemented:
 
-- `data/yfinance_ingest.py` — downloads and persists raw and curated Parquet files for a given `MarketDataRequest`
-- `data/transforms.py` — normalises yfinance output into a column-stable schema (missing `adjusted` column — see gaps)
-- `strategies/sma_cross.py` — computes fast/slow SMA crossover and emits `signal` column with values `{-1, 0, 1}`
-- `backtesting/engine.py` — runs a long/flat backtest over a signals DataFrame
-- `execution/ig.py` — stub that raises `NotImplementedError`; correct placeholder
-- `paths.py` — single source of truth for data directory layout
+**Data layer**
+- `data/yfinance_ingest.py` — downloads raw and curated Parquet files; atomic write; idempotent
+- `data/transforms.py` — normalises yfinance output to the curated schema including `adjusted` column
+- `data/models.py` — `MarketDataRequest` with interval validation
 
-### Gaps That Must Be Fixed Before New Work Starts
+**Features layer**
+- `features/indicators.py` — `sma`, `rsi`, `atr`, `macd`, `rolling_atr_average`, `sma_gap_pct`
 
-These are not cosmetic. Each one will cause incorrect behaviour or blocked tests if left unresolved.
+**Strategy layer**
+- `strategies/base.py` — `Strategy` ABC with `_validate_output` enforcing signal contract
+- `strategies/sma_cross.py` — full implementation: SMA crossover, RSI filter, ATR stop/TP, confidence score, conflict flag, volatility flag
+- `strategies/quality.py` — pure functions: `confidence_score`, `signal_strength_pct`, `is_conflicting`, `is_high_volatility`, `compute_stop_loss`, `compute_take_profit`
+- `strategies/loader.py` — loads a strategy from a YAML config file
 
-**GAP-001 — BacktestConfig is incomplete**
-`BacktestConfig` has `initial_cash`, `commission_bps`, and `slippage_bps`. It is missing `symbol`, `timeframe`, `start_date`, `end_date`, `strategy_name`, and `strategy_params`. A backtest result written to disk today cannot be reproduced from the config alone. Fix this before writing a single new backtest.
+**Backtesting layer**
+- `backtesting/engine.py` — long/flat/short backtest engine with no-lookahead enforcement and cost model
+- `backtesting/metrics.py` — performance metrics (total return, CAGR, Sharpe, drawdown, win rate, etc.)
+- `backtesting/models.py` — `BacktestConfig`, `BacktestResult` dataclasses
+- `backtesting/reporter.py` — saves JSON summary and trades Parquet with atomic write
+- `backtesting/validation.py` — IS/OOS split, threshold validation, degradation computation
 
-**GAP-002 — No tests directory**
-The repository has no `tests/` directory and no test runner configuration in `pyproject.toml`. This is the largest gap. All downstream work assumes tests exist. Create `tests/` and configure `pytest` as the first action in Phase 1.
+**Scripts**
+- `scripts/ingest_market_data.py` — refreshes all instruments from YAML; per-instrument error handling; `--symbol` flag
+- `scripts/run_signals.py` — generates portfolio snapshot to `data/signals/portfolio_snapshot.parquet`; atomic write; audit logging
 
-**GAP-003 — Signal contract not enforced**
-`Strategy.generate_signals` is an abstract method with no post-call validation. A subclass can return a DataFrame with no `signal` column, or with values outside `{-1, 0, 1}`, and nothing will catch it until a downstream caller crashes. The base class must validate its own return contract.
+**Application layer**
+- `app/pages/dashboard.py` — signal table with quality scores, SL/TP, LLM explanation display (cache-read only, fallback if absent), stale/conflict/volatility badges
+- `app/pages/charts.py` — interactive Plotly candlestick with SMA/RSI/MACD overlays and signal markers
+- `app/pages/backtests.py` — backtest form, results display
+- `app/pages/settings.py` — instrument and strategy config viewer/editor
 
-**GAP-004 — Engine clips signal=-1 to 0 (semantics mismatch)**
-`engine.py` calls `.clip(lower=0)` on the signal column, silently converting short signals to flat. `SmaCrossStrategy` emits `-1` correctly. The engine must be updated to support long, flat, and short positions. IG spreadbetting supports shorts on all instruments; there is no reason to restrict the engine. This must be fixed before any backtest result involving a sell signal is taken seriously.
+**Support**
+- `audit.py` — JSON-lines audit log to `logs/audit.log`
+- `paths.py` — central path definitions
+- `exceptions.py` — `ConfigValidationError`, `DataQualityError`, `SignalValidationError`, `BacktestError`, `DataSplitError`, `ValidationOrderError`, `ParameterDriftError`
 
-**GAP-005 — `adjusted` flag absent from curated Parquet**
-`MarketDataRequest` carries `adjusted=True/False`. `normalize_yfinance_daily` does not write this to the curated output. Any strategy that reads a curated file has no way to verify whether prices are adjusted. Add `adjusted` as a boolean column to the curated schema.
+**Tests — complete**
+- `tests/test_audit.py` — 7 tests
+- `tests/test_dashboard_logic.py` — pure function tests for signal label, staleness, portfolio summary
+- `tests/test_charts_logic.py` — lookback filter, chart builder
+- `tests/test_loader.py` — strategy YAML loading, validation
 
-**GAP-006 — `backtrader` installed but unused**
-`pyproject.toml` lists `backtrader` as a dependency alongside the custom engine. Decision: **remove `backtrader`**. The custom engine is simpler, fully under project control, and has no hidden assumptions about data shape. Adding a second framework creates ambiguity about which is authoritative. Remove it.
+### What Is Missing
 
-**GAP-007 — No IG epic mapping in `instruments.yaml`**
-The current `instruments.yaml` contains only SPY (wrong instrument for Phase 1) with no `ig_epic` field. This must be updated to the five Phase 1 commodities with epics added before Phase 2.
+The following items are required before Phase 1 can be closed. They are listed in build order.
 
-**GAP-008 — No structured logging**
-Scripts produce no log output. A failed ingest run leaves no trace. Structured logging using Python's `logging` module must be added to all scripts and the ingest pipeline before Phase 1 is complete.
+**Infrastructure gaps**
+- `src/trading_lab/config/loader.py` — instrument YAML validation (required by REQ-DATA-007, REQ-WATCH-001)
+- `src/trading_lab/logging_config.py` — centralised logging setup; scripts currently use inline `basicConfig`
 
-**GAP-009 — `instruments.yaml` contains wrong instruments**
-Current watchlist is SPY (an ETF). Phase 1 instruments are GC=F (Gold), CL=F (Crude Oil), SI=F (Silver), HG=F (Copper), NG=F (Natural Gas). This must be corrected before any useful signal generation can occur.
+**LLM layer — entirely absent**
+- `src/trading_lab/llm/` directory does not exist. The dashboard is wired to read from `data/signals/explanations/` but nothing generates those files.
+- Required: `base.py`, `claude_client.py`, `stub_client.py`, `explainer.py`
+- Extends to: news headline ingestion (REQ-LLM-008), two-part prompt (REQ-LLM-009), structured `SignalContext` (REQ-LLM-002)
+- Extends further to: `MarketContext` aggregator and LLM decision output (Section 11, see Step 4 below)
 
-**GAP-010 — `polars` and `scikit-learn` in dependencies without use**
-`pyproject.toml` lists `polars` and `scikit-learn`. Neither is used. `polars` creates confusion about which DataFrame library the project uses (it is `pandas`). `scikit-learn` implies ML capability that is explicitly out of scope for Phase 1-2. Remove both.
+**Stubbed test files — 6 files are 1-line stubs**
+- `tests/test_engine.py`
+- `tests/test_indicators.py`
+- `tests/test_metrics.py`
+- `tests/test_strategy.py`
+- `tests/test_transforms.py`
+- `tests/test_validation.py`
+
+**Dashboard features not yet built**
+- REQ-RISK-003 — Correlation warning (two co-directional instruments with r > 0.7)
+- REQ-RISK-004 — Position sizing calculator display in signal detail panel
+- REQ-CTX-001 — Economic calendar integration (high-impact event warnings)
+- REQ-CTX-002 — Market session awareness (OPEN/CLOSED badge per instrument)
+- REQ-OPS-005 — Backtest comparison across multiple instruments
+- Strategy validation panel on Backtests page (IS/OOS result display, REQ-VAL-004/005)
 
 ---
 
 ## 2. Target Architecture
 
-### Component Diagram
-
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        EXTERNAL SOURCES                         │
-│   yfinance (research data)    IG REST/Streaming API (live)      │
-└──────────────┬────────────────────────────┬────────────────────┘
-               │                            │
-               ▼                            ▼
-┌──────────────────────────┐   ┌────────────────────────────────┐
-│   DATA LAYER             │   │   EXECUTION LAYER              │
-│                          │   │                                │
-│  yfinance_ingest.py      │   │  ig.py (IgBrokerAdapter)       │
-│  transforms.py           │   │  broker_base.py (ABC)          │
-│  models.py (schemas)     │   │  ig_streaming.py (Phase 2)     │
-│                          │   │                                │
-│  data/raw/               │   │  data/live/  (Phase 2)         │
-│  data/curated/           │   │                                │
-└──────────────┬───────────┘   └────────────────────────────────┘
-               │                            ▲
-               ▼                            │ (order)
-┌──────────────────────────┐                │
-│   FEATURES LAYER          │   ┌───────────────────────────────┐
-│                          │   │   SIGNAL APPROVAL LAYER        │
-│  indicators.py           │   │   (Phase 2)                    │
-│  (sma, rsi, macd)        │   │                                │
-│                          │   │  signal_state.py               │
-└──────────────┬───────────┘   │  position_sizer.py             │
-               │               │  data/journal/signals.parquet  │
-               ▼               └───────────────────────────────┘
-┌──────────────────────────┐                ▲
-│   STRATEGY LAYER         │                │
-│                          │   ┌────────────┴──────────────────┐
-│  base.py (Strategy ABC)  │   │   LLM EXPLANATION LAYER        │
-│  sma_cross.py            ├──►│                                │
-│  strategy_loader.py      │   │  explainer.py                  │
-│                          │   │  llm_client.py (provider ABC)  │
-└──────────────┬───────────┘   │  claude_client.py              │
-               │               │  data/explanations/ (cache)    │
-               ▼               └───────────────────────────────┘
+│  yfinance  │  IG REST/Streaming API  │  News/Calendar (free)   │
+└──────┬──────┴────────────┬───────────┴──────────┬──────────────┘
+       │                   │                       │
+       ▼                   ▼                       ▼
+┌──────────────┐   ┌──────────────┐   ┌──────────────────────────┐
+│  DATA LAYER  │   │  EXECUTION   │   │   MARKET CONTEXT LAYER   │
+│              │   │  LAYER       │   │                          │
+│ yfinance_    │   │ ig.py        │   │ market_context.py        │
+│ ingest.py    │   │ broker_      │   │ calendar_fetcher.py      │
+│ transforms.py│   │ base.py      │   │ news_fetcher.py          │
+│ models.py    │   │ ig_streaming │   │ session_checker.py       │
+│              │   │ .py (P2)     │   │ (ig_sentiment.py P2)     │
+│ data/raw/    │   │ data/live/   │   │ data/calendar/           │
+│ data/curated/│   │ (P2)         │   │ data/news/               │
+└──────┬───────┘   └──────────────┘   └──────────┬───────────────┘
+       │                  ▲                        │
+       ▼                  │ (order)                ▼
+┌──────────────┐          │           ┌──────────────────────────┐
+│ FEATURES     │          │           │   LLM LAYER              │
+│ LAYER        │          │           │                          │
+│              │          │           │ base.py (LLMClient ABC)  │
+│ indicators.py│          │           │ claude_client.py         │
+│              │          │           │ stub_client.py           │
+└──────┬───────┘          │           │ explainer.py             │
+       │                  │           │ (llm_decision.py P1.4)   │
+       ▼                  │           │                          │
+┌──────────────┐   ┌──────────────┐   │ data/signals/            │
+│ STRATEGY     │   │ SIGNAL       │   │   explanations/          │
+│ LAYER        │──►│ APPROVAL     │   │   decisions/             │
+│              │   │ LAYER (P2)   │   └──────────┬───────────────┘
+│ base.py      │   │              │              │
+│ sma_cross.py │   │ signal_state │              │
+│ quality.py   │   │ .py          │              │
+│ loader.py    │   │ position_    │              │
+│              │   │ sizer.py     │              │
+└──────┬───────┘   └──────────────┘              │
+       │                                          │
+       ▼                                          │
+┌──────────────┐                                  │
+│ BACKTESTING  │◄─────────────────────────────────┘
+│ LAYER        │
+│              │
+│ engine.py    │
+│ metrics.py   │
+│ models.py    │
+│ reporter.py  │
+│ validation.py│
+│              │
+│ data/        │
+│  backtests/  │
+└──────┬───────┘
+       │
+       ▼
 ┌──────────────────────────┐
-│   BACKTESTING LAYER      │
+│   APPLICATION LAYER      │
 │                          │
-│  engine.py               │
-│  models.py (BacktestConfig, BacktestResult)
-│  metrics.py              │
-│  reporter.py             │
-│                          │
-│  data/backtests/         │
-└──────────────┬───────────┘
-               │
-               ▼
-┌──────────────────────────┐
-│   APPLICATION LAYER       │
-│                          │
-│  app/main.py (Streamlit) │
-│  app/pages/dashboard.py  │
-│  app/pages/charts.py     │
-│  app/pages/backtests.py  │
-│  app/pages/settings.py   │
-│  app/pages/journal.py    │   ← Phase 2
-│                          │
+│ app/main.py (Streamlit)  │
+│ app/pages/dashboard.py   │
+│ app/pages/charts.py      │
+│ app/pages/backtests.py   │
+│ app/pages/settings.py    │
+│ app/pages/journal.py (P2)│
 └──────────────────────────┘
-               │
-               ▼
-┌──────────────────────────┐
-│   CONFIG LAYER            │
-│                          │
-│  config/instruments.yaml │
-│  config/strategies/*.yaml│
-│  config/environments/*.yaml
-│  .env (secrets only)     │
-└──────────────────────────┘
-```
-
-### Module Boundaries
-
-**Data layer** (`src/trading_lab/data/`) owns everything up to and including validated curated Parquet files. It knows nothing about strategies, backtests, or the broker.
-
-**Features layer** (`src/trading_lab/features/`) provides pure indicator functions (SMA, RSI, MACD) that operate on `pd.Series`. No DataFrame I/O, no strategy logic. Strategies call these; the features layer does not call strategies.
-
-**Strategy layer** (`src/trading_lab/strategies/`) owns signal generation. A strategy takes a curated bars DataFrame, calls feature functions, and returns an annotated signals DataFrame. Strategies are pure functions of data — no I/O, no external calls.
-
-**Backtesting layer** (`src/trading_lab/backtesting/`) owns simulation, metrics, and result persistence. It takes signals DataFrames and `BacktestConfig` objects. It does not know about the broker.
-
-**LLM layer** (`src/trading_lab/llm/`) owns explanation generation, caching, and provider abstraction. It reads signal rows and returns plain-English text. It does not write signals or trigger trades.
-
-**Execution layer** (`src/trading_lab/execution/`) owns all broker communication. In Phase 1 this is a stub. In Phase 2 it authenticates and places paper orders. It knows nothing about signal generation.
-
-**Application layer** (`app/`) owns the Streamlit dashboard. It orchestrates all other layers but contains no business logic itself. It reads from the data directory and calls package functions.
-
-### Data Flow — Phase 1 (Research)
-
-```
-instruments.yaml
-    → ingest script
-        → yfinance API
-            → data/raw/<symbol>_1d_yfinance.parquet   (source-faithful)
-            → data/curated/<symbol>_1d_yfinance.parquet (validated schema)
-                → SmaCrossStrategy.generate_signals()
-                    → signals DataFrame (in memory)
-                        → LLM explainer
-                            → data/explanations/<symbol>_<date>.json (cached)
-                        → backtest engine
-                            → data/backtests/<symbol>_1d_sma_cross_<ts>_summary.json
-                            → data/backtests/<symbol>_1d_sma_cross_<ts>_trades.parquet
-                        → Streamlit dashboard (reads from disk)
-```
-
-### Data Flow — Phase 2 (Paper Trading)
-
-```
-(Phase 1 data flow, plus:)
-
-signals DataFrame
-    → signal state manager
-        → data/journal/signals.parquet (pending signals persisted)
-            → [User: Approve]
-                → position sizer
-                    → [User: Confirm with size]
-                        → IgBrokerAdapter.place_order() [demo]
-                            → data/journal/trades.parquet (entry recorded)
-
-IG Streaming API
-    → data/live/<symbol>_1d_ig_streaming.parquet
-        → dashboard positions panel (unrealised P&L)
-            → [Position closed on IG platform]
-                → IgBrokerAdapter.get_closed_positions()
-                    → data/journal/trades.parquet (exit recorded)
 ```
 
 ---
 
-## 3. LLM Integration Design
+## 3. Phase 1 — Remaining Work
 
-### Where in the Call Chain
+Phase 1 closes when: all steps complete, all tests pass (80% line coverage on `src/` excluding `execution/ig.py`), and the Streamlit dashboard renders live signal data for all five commodity instruments with LLM explanations, market context, and strategy validation.
 
-The LLM sits between signal generation and display. It is called once per new signal, its output is cached to disk, and the dashboard reads from the cache. The LLM is never in the critical path for data refresh, backtesting, or order placement.
+---
 
+### Step 1 — Infrastructure Gaps (1 day)
+
+**1.1 — Config loader**
+Create `src/trading_lab/config/loader.py`. Implement `load_instruments(config_path: Path) -> list[dict]`. Validates each entry: all required fields present (`symbol`, `name`, `asset_class`, `timeframe`, `source`, `session_timezone`, `adjusted_prices`), `asset_class` in `{commodity, equity, index, fx}`, `timeframe` in `{1d, 1wk}`, `session_timezone` is valid IANA identifier (use `zoneinfo.available_timezones()`). Raises `ConfigValidationError` identifying the instrument and field on any failure. Tests: `tests/test_config_loader.py` (happy path, missing field, invalid asset_class, invalid timezone).
+
+**1.2 — Logging config module**
+Create `src/trading_lab/logging_config.py`. Implement `setup_logging(level=logging.INFO)` that configures a root logger with a `RotatingFileHandler` to `logs/trading_lab.log` (max 5MB, 3 backups) and a `StreamHandler` to stdout. Format: `%(asctime)s | %(levelname)-8s | %(name)s | %(message)s`. Update `scripts/ingest_market_data.py` and `scripts/run_signals.py` to call `setup_logging()` instead of `basicConfig`.
+
+---
+
+### Step 2 — Fill Stubbed Tests (1-2 days)
+
+Fill all six stub test files. Each file should be self-contained with synthetic fixtures defined locally or in `tests/conftest.py`. No live network calls. No disk I/O except via `tmp_path`.
+
+**`tests/test_transforms.py`** — REQ-DATA-002, REQ-DATA-003, REQ-DATA-005
 ```
-signals DataFrame
-    → [signal != 0 AND signal is new (position_change != 0)]
-        → ExplanationService.get_or_generate(signal_row)
-            → cache lookup: data/explanations/<symbol>_<date>_<signal>.json
-                → [cache hit] return cached text
-                → [cache miss] LLMClient.generate_explanation(prompt)
-                    → write to cache
-                    → return text
+- test_normalize_produces_required_columns
+- test_timestamp_is_utc_aware
+- test_adjusted_column_set_from_request
+- test_null_close_rows_excluded
+- test_negative_close_rows_excluded
+- test_null_close_above_threshold_raises_data_quality_error
 ```
 
-### Interface Design
+**`tests/test_indicators.py`** — REQ-SIG-006
+```
+- test_sma_warmup_produces_correct_null_count
+- test_sma_values_are_correct_on_known_series
+- test_rsi_values_in_valid_range
+- test_rsi_short_series_raises_value_error
+- test_macd_output_has_required_columns
+- test_atr_positive_for_valid_ohlc
+```
 
-**`LLMClient` (abstract base)**
+**`tests/test_strategy.py`** — REQ-SIG-001 to REQ-SIG-005
+```
+- test_missing_signal_column_raises_signal_validation_error
+- test_signal_values_outside_set_raises
+- test_crossover_detected_on_known_synthetic_bars
+- test_sell_signal_emitted_as_negative_one
+- test_rsi_filter_suppresses_overbought_buy
+- test_rsi_filter_suppresses_oversold_sell
+- test_rsi_filter_disabled_allows_overbought_buy
+- test_fast_window_gte_slow_raises
+- test_position_change_column_present
+- test_stop_loss_below_entry_for_long
+- test_take_profit_above_entry_for_long
+- test_stop_loss_above_entry_for_short
+```
 
+**`tests/test_engine.py`** — REQ-BT-002 to REQ-BT-008
+```
+- test_no_lookahead_signal_bar_5_position_bar_6
+- test_short_position_profits_on_falling_market
+- test_short_position_loses_on_rising_market
+- test_zero_cost_gross_return_equals_market_return
+- test_higher_turnover_incurs_higher_cost
+- test_insufficient_bars_raises_backtest_error
+```
+
+**`tests/test_metrics.py`** — REQ-BT-005
+```
+- test_sharpe_against_hand_calculated_reference
+- test_max_drawdown_against_hand_calculated_reference
+- test_max_drawdown_duration_unrecovered
+- test_win_rate_fewer_than_two_trades_returns_none
+- test_profit_factor_no_losing_trades_returns_none
+- test_daily_annualisation_constant_252
+- test_weekly_annualisation_constant_52
+```
+
+**`tests/test_validation.py`** — REQ-VAL-001 to REQ-VAL-005
+```
+- test_split_200_bars_oos_030_produces_140_60
+- test_no_bar_in_both_periods
+- test_oos_ratio_below_010_raises
+- test_oos_period_under_30_bars_raises_data_split_error
+- test_validate_oos_approved_when_both_thresholds_met
+- test_validate_oos_rejected_sharpe_too_low
+- test_validate_oos_rejected_drawdown_too_high
+- test_validate_oos_rejected_both_failures_listed
+- test_degradation_above_50pct_triggers_warning
+- test_degradation_undefined_when_is_sharpe_zero
+```
+
+---
+
+### Step 3 — LLM Layer (2-3 days)
+
+The LLM layer produces plain-English explanations and (per Section 11) a structured go/no-go decision judgment. Both are cached to disk and read by the dashboard. The layer never runs synchronously on page load.
+
+**3.1 — Exceptions**
+Add `LLMError`, `LLMTimeoutError`, `ConfigurationError` to `src/trading_lab/exceptions.py`.
+
+**3.2 — LLM module skeleton**
+Create `src/trading_lab/llm/` with `__init__.py`. Files:
+
+`base.py`
 ```python
-# src/trading_lab/llm/base.py
 class LLMClient(ABC):
     @abstractmethod
     def complete(self, prompt: str) -> str:
-        """Send a prompt and return the completion text."""
+        """Send a prompt; return completion text."""
 ```
 
-**`ClaudeClient` (concrete implementation)**
-
+`stub_client.py`
 ```python
-# src/trading_lab/llm/claude_client.py
-class ClaudeClient(LLMClient):
-    def __init__(self, model: str = "claude-opus-4-6", max_tokens: int = 500):
-        ...
+STUB_RESPONSE = "[Stub explanation — LLM not configured]"
+
+class StubLLMClient(LLMClient):
     def complete(self, prompt: str) -> str:
-        # Calls Anthropic API using ANTHROPIC_API_KEY from env
-        ...
+        return STUB_RESPONSE
 ```
 
-**`ExplanationService`**
+`claude_client.py`
+- Reads `ANTHROPIC_API_KEY` from environment. Raises `ConfigurationError` if absent.
+- Default model: `claude-sonnet-4-6`. Configurable via constructor.
+- Raises `LLMTimeoutError` on timeout (default 30s, configurable).
+- Raises `LLMError` on any API error, wrapping the original exception message.
+- Logs every call at DEBUG with latency; logs every error at WARNING.
+
+**3.3 — SignalContext dataclass**
+Create `src/trading_lab/llm/context.py`. Implement `SignalContext` dataclass (REQ-LLM-002):
+```python
+@dataclass(frozen=True)
+class SignalContext:
+    symbol: str
+    instrument_name: str
+    signal_date: date
+    signal: int                  # 1 or -1
+    signal_direction: str        # "LONG" or "SHORT"
+    close: float
+    fast_sma: float
+    slow_sma: float
+    rsi: float
+    recent_trend_summary: str    # e.g. "price up 4.2% over 5 bars"
+    stop_loss_level: float
+    take_profit_level: float
+    risk_reward_ratio: float
+    confidence_score: int
+    conflicting_indicators: bool
+    high_volatility: bool
+    news_headlines: list[dict]   # each: {title, source, timestamp}; empty list if none
+```
+
+Implement `build_signal_context(signal_row: dict, instrument: dict, news: list[dict]) -> SignalContext`.
+
+**3.4 — Prompt templates**
+Create `src/trading_lab/llm/prompts.py`. Store prompt templates as module-level string constants (not embedded in classes). Two templates:
+
+`EXPLANATION_PROMPT_WITH_NEWS` — used when `len(signal_context.news_headlines) > 0`. Two-part structure (REQ-LLM-009):
+1. Technical basis: why the signal fired based on indicator readings
+2. News context: whether recent headlines support, contradict, or are neutral relative to signal direction. When contradictory, the tension must be flagged explicitly.
+
+`EXPLANATION_PROMPT_NO_NEWS` — used when no headlines available. Purely technical explanation.
+
+Both prompts instruct the LLM: 3–5 sentences, plain English, no price predictions, no investment advice, directionally consistent with the signal.
+
+**3.5 — ExplanationService**
+Create `src/trading_lab/llm/explainer.py`. Implement:
 
 ```python
-# src/trading_lab/llm/explainer.py
 @dataclass(frozen=True)
 class SignalExplanation:
     symbol: str
     signal_date: date
-    signal: int              # 1 or -1
+    signal: int
     explanation: str
     generated_at: datetime
     model: str
     cached: bool
 
 class ExplanationService:
-    def __init__(self, client: LLMClient, cache_dir: Path):
-        ...
-    def get_or_generate(self, signal_row: dict) -> SignalExplanation:
-        """Return cached explanation or generate and cache a new one."""
+    def __init__(self, client: LLMClient, cache_dir: Path): ...
+    def get_or_generate(self, context: SignalContext) -> SignalExplanation: ...
 ```
 
-### Prompt Design
+Cache path: `data/signals/explanations/<symbol>_<date>.json`
+Cache hit: return with `cached=True`, no API call.
+Cache miss: call LLM, validate output (non-empty, ≤ 1000 chars), write JSON, return with `cached=False`.
+On any API failure: catch exception, log WARNING, return `SignalExplanation` with `explanation="Explanation unavailable."` (the constant from REQ-LLM-004).
+Post-generation validation failure: treat as API failure (log, return fallback).
+Log audit event `llm_call_made` or `llm_call_cached` or `llm_call_failed` via `audit.log_event`.
 
-The prompt is constructed from the signal row context. It is explicit about the instrument, the signal direction, and the indicator values that triggered it. The prompt is deterministic given the same inputs.
+**3.6 — LLM Decision Layer (Section 11, REQ-LLMDEC-001 to REQ-LLMDEC-004)**
+Create `src/trading_lab/llm/decision.py`. This extends the LLM role from explanation to structured judgment.
 
-```
-You are a quantitative trading analyst. Provide a concise explanation (3-4 sentences)
-of the following trading signal for a human trader reviewing it on a dashboard.
-Be factual and technical. Do not give investment advice or price predictions.
-
-Instrument: {name} ({symbol})
-Signal date: {date}
-Signal: {"BUY (long)" if signal == 1 else "SELL (short)"}
-Close price: {close}
-Fast SMA ({fast_window}): {fast_sma:.2f}
-Slow SMA ({slow_window}): {slow_sma:.2f}
-RSI (14): {rsi:.1f}
-
-Explain what technical conditions triggered this signal and what they indicate
-about the current trend. Note any factors that would reduce or increase confidence
-in this signal (e.g. RSI level, signal freshness, recent volatility).
-```
-
-### Caching Strategy
-
-Cache location: `data/explanations/`
-Cache filename: `{symbol}_{date}_{signal}.json` (e.g. `GC=F_2026-04-03_1.json`)
-Cache format: JSON matching the `SignalExplanation` schema
-Cache invalidation: never (signal explanations are historical facts; if the signal for a given date does not change, the explanation does not change)
-Regeneration: if the cache file is manually deleted, the next dashboard load regenerates it
-
-The cache key encodes symbol, date, and signal value. If a signal changes direction intraday (not expected on daily bars), the new direction generates a new cache entry without overwriting the old one.
-
-### Provider Abstraction
-
-The `LLMClient` ABC allows swapping providers. The active provider is selected at startup:
-
-```yaml
-# config/environments/local.yaml
-llm:
-  provider: claude          # or: openai, stub
-  model: claude-opus-4-6
-  max_tokens: 500
-  timeout_seconds: 30
+```python
+@dataclass(frozen=True)
+class LLMDecision:
+    symbol: str
+    signal_date: date
+    signal: int                  # the technical signal direction
+    llm_recommendation: str      # "GO", "NO_GO", or "UNCERTAIN"
+    rationale: str               # 1-3 sentences
+    conflicts_with_technical: bool
+    generated_at: datetime
+    model: str
+    cached: bool
 ```
 
-A `StubLLMClient` returns a fixed string for test environments without making API calls. This is the default when `ANTHROPIC_API_KEY` is absent.
+`DecisionService` follows the same cache-first pattern as `ExplanationService`. Cache path: `data/signals/decisions/<symbol>_<date>.json`.
 
----
+The prompt for decision output is separate from the explanation prompt. It provides the full `SignalContext` (including news, market context when available) and asks the LLM to return a structured JSON response with `recommendation` ("GO"/"NO_GO"/"UNCERTAIN"), `rationale`, and `conflicts_with_technical` (bool). The response is parsed and validated; any parse failure falls back to `UNCERTAIN` with the explanation `"Decision unavailable."`.
 
-## 4. Phase 1 Build Order
+"No trade" is a first-class outcome (REQ-GUARD-001): the prompt explicitly states that NO_GO or UNCERTAIN are acceptable and preferred over a forced GO when the evidence is mixed.
 
-Phase 1 closes when all listed steps are complete, all named tests pass, and the Streamlit dashboard renders signal data for all five commodity instruments from local Parquet files.
+**3.7 — News ingestion (REQ-LLM-008)**
+Add `fetch_news(symbol: str, max_headlines: int = 5) -> list[dict]` to `src/trading_lab/data/yfinance_ingest.py`. Uses `yfinance.Ticker(symbol).news`. Returns a list of dicts with `{title, source, timestamp}`. If the API returns nothing or errors, returns an empty list (logged at DEBUG).
 
-### Step 0 — Fix Gaps Before Writing New Code (1-2 days)
+Update `scripts/run_signals.py` to call `fetch_news` for each instrument after signal generation and store headlines in the portfolio snapshot (added as a new JSON column `news_headlines`). Headlines are then available to `ExplanationService` and `DecisionService` without a second API call.
 
-These must be done in order because later steps depend on them.
+**3.8 — Config-driven provider selection**
+`config/environments/local.yaml` `llm.provider` selects the client class (`claude` or `stub`). Default: `claude`. If `ANTHROPIC_API_KEY` is absent and provider is `claude`, fall back to `stub` and log a WARNING at startup.
 
-**0.1 — Remove unused dependencies**
-Remove `backtrader`, `polars`, and `scikit-learn` from `pyproject.toml`. Add `streamlit`, `plotly`, `anthropic`, `pytest`, `pytest-cov` to the appropriate dependency groups. Add `streamlit` to main deps; put `pytest`, `pytest-cov` under `[project.optional-dependencies]` as `dev`.
-
-**0.2 — Create test infrastructure**
-Create `tests/__init__.py`, `tests/conftest.py`, and `tests/data/`, `tests/strategies/`, `tests/backtesting/`, `tests/llm/` subdirectories. Add `pytest` configuration to `pyproject.toml`:
-```toml
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "--tb=short"
+**3.9 — Tests**
 ```
-
-**0.3 — Fix BacktestConfig**
-Add `symbol: str`, `timeframe: str`, `start_date: date`, `end_date: date`, `strategy_name: str`, `strategy_params: dict` to `BacktestConfig`. Add `__post_init__` validation that `start_date < end_date`.
-
-**0.4 — Fix backtest engine (short support)**
-Remove `.clip(lower=0)` from `engine.py`. Replace `run_long_flat_backtest` with `run_backtest` that handles `position = signal.shift(1)` without clipping. The short side inverts returns: `gross_return = position * market_return` already handles this correctly once clipping is removed. Add module-level docstring stating: "Execution is assumed at the close of the bar following signal generation (next-bar close). This is an approximation; next-bar open is not available from yfinance daily OHLCV." Rename the function to `run_backtest` so callers know it is not long/flat-only.
-
-**0.5 — Fix curated schema (adjusted flag)**
-Add `adjusted: bool` column to `normalize_yfinance_daily`. Populate it from `MarketDataRequest.adjusted` (requires threading it through `ingest_yfinance_daily`). Update the curated schema validation to require this column.
-
-**0.6 — Fix instruments.yaml**
-Replace SPY with the five Phase 1 commodities. Add `name` and `asset_class` fields. Leave `ig_epic` as a comment placeholder (`# required for Phase 2`):
-
-```yaml
-instruments:
-  - symbol: "GC=F"
-    name: Gold Futures
-    asset_class: commodity
-    timeframe: 1d
-    source: yfinance
-    session_timezone: America/New_York
-    adjusted_prices: true
-    # ig_epic: CS.D.GOLD.CFD.IP   # required for Phase 2
-
-  - symbol: "CL=F"
-    name: Crude Oil WTI Futures
-    asset_class: commodity
-    timeframe: 1d
-    source: yfinance
-    session_timezone: America/New_York
-    adjusted_prices: true
-
-  - symbol: "SI=F"
-    name: Silver Futures
-    asset_class: commodity
-    timeframe: 1d
-    source: yfinance
-    session_timezone: America/New_York
-    adjusted_prices: true
-
-  - symbol: "HG=F"
-    name: Copper Futures
-    asset_class: commodity
-    timeframe: 1d
-    source: yfinance
-    session_timezone: America/New_York
-    adjusted_prices: true
-
-  - symbol: "NG=F"
-    name: Natural Gas Futures
-    asset_class: commodity
-    timeframe: 1d
-    source: yfinance
-    session_timezone: America/New_York
-    adjusted_prices: true
-```
-
-**0.7 — Add structured logging**
-Create `src/trading_lab/logging_config.py` that configures a root logger with a `RotatingFileHandler` to `logs/trading_lab.log` and a `StreamHandler` to stdout. Both emit the format: `%(asctime)s | %(levelname)-8s | %(name)s | %(message)s`. All scripts call `setup_logging()` before doing anything else. Create `logs/` directory and add `logs/*.log` to `.gitignore`.
-
----
-
-### Step 1 — Data Layer Hardening (2-3 days)
-
-**1.1 — Config loader module**
-Create `src/trading_lab/config/loader.py`. Implement `load_instruments()` that reads `instruments.yaml`, validates each entry against a defined schema (`symbol`, `name`, `asset_class`, `timeframe`, `source`, `session_timezone`, `adjusted_prices` all required), raises `ConfigValidationError` on any missing or invalid field. `asset_class` must be one of `{commodity, equity, index, fx}`. `timeframe` must be one of `{1d, 1wk}`. `session_timezone` must be a valid IANA identifier (use `zoneinfo.available_timezones()`).
-
-**1.2 — Data validation in ingest**
-Add `validate_curated_dataframe(df: pd.DataFrame)` to `data/transforms.py`. It checks: all required columns present, `timestamp` is UTC-aware, no null `close` values, no `close <= 0`. Called by `ingest_yfinance_daily` before writing the curated file. Add a `DataQualityError` custom exception in `src/trading_lab/exceptions.py`.
-
-**1.3 — Ingest script**
-Create `scripts/ingest_market_data.py`. Reads all instruments from `config/instruments.yaml`. For each instrument: calls `ingest_yfinance_daily`, logs success at INFO or failure at ERROR, continues on failure. Exits with code 1 if any instrument failed. Add `--symbol` flag to allow single-instrument refresh.
-
-**1.4 — Multi-timeframe support**
-Add interval validation to `MarketDataRequest.__post_init__`: permitted values are `{"1d", "1wk"}`. Any other value raises `ValueError` at construction time, not at download time.
-
-**1.5 — Tests**
-```
-tests/data/test_transforms.py
-  - test_normalize_produces_expected_columns
-  - test_timestamp_is_utc_aware
-  - test_null_close_raises
-  - test_adjusted_column_matches_request
-  - test_negative_close_is_rejected
-
-tests/data/test_models.py
-  - test_invalid_interval_raises_at_construction
-
-tests/config/test_loader.py
-  - test_load_instruments_happy_path
-  - test_missing_field_raises_config_validation_error
-  - test_invalid_asset_class_raises
-  - test_invalid_timezone_raises
-```
-
----
-
-### Step 2 — Strategy Layer (2 days)
-
-**2.1 — Features module**
-Create `src/trading_lab/features/indicators.py`. Implement:
-- `sma(prices: pd.Series, window: int) -> pd.Series`
-- `rsi(prices: pd.Series, period: int = 14) -> pd.Series`
-- `macd(prices: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame` (columns: `macd_line`, `signal_line`, `histogram`)
-
-Each function raises `ValueError` if the input series is shorter than the minimum required length. None modify the input in place.
-
-**2.2 — Strategy base class validation**
-Wrap the abstract `generate_signals` call in the base class. Add a `_validate_signals(df: pd.DataFrame)` method that checks: `signal` column exists, all values are in `{-1, 0, 1}`. Call it from a concrete `generate_signals` wrapper that subclasses override via `_compute_signals`. This enforces the contract at the boundary without requiring every subclass to repeat validation.
-
-**2.3 — SmaCrossStrategy with RSI filter**
-Update `SmaCrossStrategy` to call `indicators.sma` and `indicators.rsi` from the features module. Add constructor parameters: `rsi_period=14`, `rsi_overbought=70`, `rsi_oversold=30`, `rsi_filter_enabled=True`. When filter is enabled: suppress `signal=1` where RSI >= `rsi_overbought`; suppress `signal=-1` where RSI <= `rsi_oversold`. Use the features module, not inline rolling calculations.
-
-**2.4 — Strategy loader**
-Create `src/trading_lab/strategies/loader.py`. Implement `load_strategy(config_path: Path) -> Strategy` that reads a strategy YAML, identifies the strategy class by the `strategy` key, instantiates it with `params`, raises `ConfigValidationError` on missing required params.
-
-**2.5 — Signal runner**
-Create `src/trading_lab/signals/runner.py`. Implement `run_signals_for_all_instruments(instruments: list[dict], strategy: Strategy) -> pd.DataFrame` that returns a portfolio-level signal summary DataFrame with columns: `symbol`, `name`, `timestamp_of_last_bar`, `signal`, `close`, `fast_sma`, `slow_sma`, `rsi`, `status`. If a curated file is missing, that instrument appears with `signal=None` and `status="data_missing"`.
-
-**2.6 — Tests**
-```
-tests/strategies/test_base.py
-  - test_missing_signal_column_raises
-
-tests/strategies/test_sma_cross.py
-  - test_fast_window_gte_slow_raises
-  - test_warmup_period_is_zero
-  - test_crossover_detected_correctly (synthetic data, known crossover bar)
-  - test_sell_signal_emitted_as_negative_one
-  - test_rsi_filter_suppresses_overbought_buy
-  - test_rsi_filter_suppresses_oversold_sell
-  - test_rsi_filter_disabled_allows_overbought_buy
-
-tests/features/test_indicators.py
-  - test_sma_warmup_count
-  - test_rsi_bounds
-  - test_rsi_short_series_raises
-  - test_macd_columns_present
-```
-
----
-
-### Step 3 — Backtesting Layer (2 days)
-
-**3.1 — BacktestConfig finalised**
-(Already done in Step 0.3.) Add `risk_free_rate: float = 0.0` to `BacktestConfig`. Add named constants to `engine.py`: `ANNUAL_TRADING_DAYS_DAILY = 252`, `ANNUAL_TRADING_DAYS_WEEKLY = 52`. Map them from `BacktestConfig.timeframe`.
-
-**3.2 — Metrics module**
-Create `src/trading_lab/backtesting/metrics.py`. Implement `compute_metrics(equity_curve: pd.Series, trades: pd.DataFrame, config: BacktestConfig) -> BacktestResult`. Returns a `BacktestResult` dataclass with: `total_return`, `cagr`, `sharpe_ratio`, `max_drawdown`, `max_drawdown_duration`, `win_rate`, `num_trades`, `avg_trade_return`, `profit_factor`. Any metric undefined by insufficient trades is `None`, not zero or NaN.
-
-**3.3 — Trade log extraction**
-The engine must extract a trade log from the position series: one row per round-trip trade with `entry_timestamp`, `exit_timestamp`, `entry_price`, `exit_price`, `direction`, `gross_return`, `cost`, `net_return`. Entry = `position_change != 0` when position becomes non-zero. Exit = `position_change != 0` when position becomes zero or reverses.
-
-**3.4 — Result persistence**
-Create `src/trading_lab/backtesting/reporter.py`. Implement `save_backtest_result(result: BacktestResult, config: BacktestConfig, trade_log: pd.DataFrame, output_dir: Path)`. Filename convention: `{symbol}_{timeframe}_{strategy_name}_{utc_ts}_summary.json` and `..._trades.parquet`. If a file with the same name exists, append `_1`, `_2`, etc. Write summary JSON only after all metrics compute successfully (write to a temp file, then rename).
-
-**3.5 — Tests**
-```
-tests/backtesting/test_engine.py
-  - test_no_lookahead (signal on bar 5, position on bar 6)
-  - test_short_position_profits_on_falling_market
-  - test_zero_cost_equals_market_return
-  - test_higher_turnover_incurs_higher_cost
-
-tests/backtesting/test_metrics.py
-  - test_sharpe_against_hand_calculated_reference
-  - test_max_drawdown_against_hand_calculated_reference
-  - test_insufficient_trades_returns_none
-  - test_daily_vs_weekly_annualisation_constant
-```
-
----
-
-### Step 4 — LLM Explanation Layer (1-2 days)
-
-**4.1 — Custom exceptions**
-Add `LLMError`, `LLMTimeoutError` to `src/trading_lab/exceptions.py`.
-
-**4.2 — LLM module**
-Create `src/trading_lab/llm/` with `__init__.py`, `base.py`, `claude_client.py`, `stub_client.py`, `explainer.py`. Implement per interface definitions in Section 7. `ClaudeClient` reads `ANTHROPIC_API_KEY` from environment via `python-dotenv`. Raises `LLMError` on API failure; raises `LLMTimeoutError` on timeout (configurable, default 30s). `StubLLMClient` returns a fixed string `"[Stub explanation — LLM not configured]"`.
-
-**4.3 — Cache**
-`ExplanationService` checks `data/explanations/<symbol>_<date>_<signal>.json` before calling the LLM. Cache hit: return cached `SignalExplanation` with `cached=True`. Cache miss: call LLM, write JSON, return with `cached=False`. The cache directory is created if absent.
-
-**4.4 — Config-driven provider selection**
-`local.yaml` `llm.provider` selects the client class. If `ANTHROPIC_API_KEY` is absent and provider is `claude`, fall back to `stub` and log a WARNING.
-
-**4.5 — Tests**
-```
-tests/llm/test_explainer.py
+tests/test_llm.py
   - test_cache_hit_does_not_call_llm
   - test_cache_miss_calls_llm_and_writes_cache
   - test_stub_client_returns_fixed_string
-  - test_missing_api_key_falls_back_to_stub
+  - test_missing_api_key_raises_configuration_error
+  - test_api_failure_returns_fallback_explanation
+  - test_decision_no_go_is_first_class_outcome (UNCERTAIN returned when evidence mixed)
+  - test_decision_parse_failure_falls_back_to_uncertain
+  - test_fetch_news_empty_list_on_error
+  - test_fetch_news_capped_at_max_headlines
+  - test_signal_context_all_fields_populated
 ```
 
 ---
 
-### Step 5 — Streamlit Dashboard (3-5 days)
+### Step 4 — Market Context Engine (1-2 days)
 
-**5.1 — App structure**
-Create `app/main.py` (entry point), `app/pages/dashboard.py`, `app/pages/charts.py`, `app/pages/backtests.py`, `app/pages/settings.py`. Use Streamlit's multi-page app convention (`pages/` directory).
+Covers Section 11 of requirements, Phase 1 scope only (IG sentiment deferred to Phase 2).
 
-**5.2 — Dashboard page**
-Signal table showing all instruments with `Symbol`, `Name`, `Last Price`, `Change %`, `Signal` (coloured), `Fast SMA`, `Slow SMA`, `RSI`, `Last Updated`. Portfolio summary panel: counts of Buy/Sell/Neutral/Missing. Refresh button that calls `ingest_market_data` and recomputes signals. Last refresh timestamp in sidebar. Signals are recomputed on refresh only, not on every page load. LLM explanation shown below each non-neutral signal row.
+**4.1 — Economic calendar (REQ-CTX-001)**
+Create `src/trading_lab/context/calendar_fetcher.py`. Implement `fetch_high_impact_events(lookforward_days: int = 5) -> list[dict]`. Fetches from Investing.com RSS or equivalent free source. Each event: `{name, date, time_utc, currency, impact}`. Filter to `impact="high"`. Map currency to watchlist instruments (USD events apply to all five Phase 1 commodities). Cache to `data/calendar/events_<YYYYMMDD>.json`. If fetch fails: log WARNING, return empty list — never propagate to dashboard.
 
-**5.3 — Charts page**
-Instrument dropdown (from `instruments.yaml`). Timeframe selector (Daily/Weekly). Date range selector (3m/6m/1y/2y/All). Interactive Plotly candlestick chart. SMA overlay with configurable windows. RSI and MACD in subplots. Signal event markers overlaid on price chart (triangles on entry bars).
+**4.2 — Session awareness (REQ-CTX-002)**
+Create `src/trading_lab/context/session_checker.py`. Implement `is_session_open(instrument: dict) -> bool`. Reads `session_open`, `session_close`, `session_timezone` from instrument dict. Uses current system time. Weekends always CLOSED. No holiday calendar in Phase 1. Tests: in-session, out-of-session, Saturday.
 
-**5.4 — Backtests page**
-Form inputs for symbol, timeframe, date range, strategy, parameters. "Run Backtest" button. Results: metrics card, equity curve chart, trade log table. Previous results loadable from `data/backtests/`.
+Note: `instruments.yaml` must be updated to add `session_open` and `session_close` fields for each instrument (see Section 7).
 
-**5.5 — Settings page**
-Display instruments from `instruments.yaml` and active strategy parameters. Allow edits written back to YAML. No credential fields exposed.
+**4.3 — MarketContext aggregator (REQ-CONTEXT-001, REQ-CONTEXT-002)**
+Create `src/trading_lab/context/market_context.py`. Implement:
 
-**5.6 — Graceful degradation**
-Dashboard renders with `Data Missing` states when no curated files exist. No network calls on page load. Stale data warning if last bar is more than 2 trading days old.
+```python
+@dataclass
+class MarketContext:
+    symbol: str
+    as_of: datetime
+    session_open: bool
+    upcoming_events: list[dict]      # from calendar_fetcher
+    news_headlines: list[dict]       # from run_signals snapshot
+    ig_sentiment: None               # Phase 2; always None in Phase 1
+```
+
+Implement `build_market_context(symbol, instrument_config, events, news) -> MarketContext`.
+
+Persist to `data/signals/market_context_<symbol>_<YYYYMMDD>.json` during the signals run. Dashboard and LLM layer read from this file — no recomputation on page load.
+
+**4.4 — StructuredModelContext (REQ-MCTX-001, REQ-MCTX-002)**
+Create `src/trading_lab/llm/model_context.py`. Implement `build_model_context(signal_context: SignalContext, market_context: MarketContext) -> dict` that assembles the full structured payload passed to both `ExplanationService` and `DecisionService`. Validates all required fields are non-null before handing to the LLM (REQ-MCTX-002 validation gate): if any required field is null, the gate logs a WARNING and omits the null fields from the payload with an explicit note in the prompt.
+
+**4.5 — Price confirmation guardrail (REQ-GUARD-002)**
+In `scripts/run_signals.py`, after generating a signal, verify that the current close price is on the expected side of the slow SMA for the signal direction:
+- LONG signal: close must be above slow_sma (or within 0.5% of it)
+- SHORT signal: close must be below slow_sma (or within 0.5% of it)
+If the check fails, log a WARNING and set `confidence_score` to `max(0, confidence_score - 25)`. Do not suppress the signal; this is a display-only penalty. The 0.5% tolerance is a named constant.
+
+**4.6 — Update run_signals.py**
+Update `scripts/run_signals.py` to:
+- Fetch news per instrument after signal generation (Step 3.7)
+- Build `MarketContext` per instrument (Step 4.3)
+- Apply price confirmation guardrail (Step 4.5)
+- Pass full `ModelContext` to `ExplanationService` and `DecisionService`
+- Persist explanations and decisions to cache during the signals run (not on dashboard load)
+
+---
+
+### Step 5 — Dashboard Remaining Features (2-3 days)
+
+**5.1 — Market context display**
+Add to each signal row on the Dashboard page:
+- Session badge: `OPEN` (green) or `CLOSED` (grey) — REQ-CTX-002
+- Upcoming event warnings: amber badge `UPCOMING EVENT: <name> <date>` for any high-impact event within 5 trading days — REQ-CTX-001
+- LLM decision badge: `GO` (green), `NO_GO` (red), `UNCERTAIN` (amber) from `DecisionService` cache
+- LLM decision rationale in the signal expander (alongside explanation)
+
+**5.2 — Position sizing calculator (REQ-RISK-004)**
+Add to signal detail expander for LONG/SHORT signals:
+- Inputs: `capital` (from `local.yaml`), `risk_per_trade_pct`, `stop_distance`
+- Output: `position_size_units` (rounded down), `GBP_risk`
+- Show all inputs transparently in the expander
+- Display `N/A - stop distance unavailable` if `stop_distance` is zero/null
+
+**5.3 — Correlation warning (REQ-RISK-003)**
+Add `compute_correlation_warnings(snapshot_df, curated_dir) -> list[dict]` to dashboard logic. Computes 60-bar rolling Pearson correlation between each pair of instruments from curated close price series. Returns warnings for pairs where `r > 0.7` AND both show the same direction signal. Display above signal table as a warning card. Threshold `0.7` is a named constant. Tests in `tests/test_dashboard_logic.py`.
+
+**5.4 — Strategy validation panel on Backtests page**
+Add a "Strategy Validation" tab to the Backtests page:
+- Run In-Sample and Out-of-Sample buttons (in that order; OOS blocked until IS artefact exists)
+- Side-by-side Sharpe comparison, degradation percentage, overfitting warning if degradation > 50%
+- Approval status badge: `APPROVED FOR PAPER TRADING` or `NOT APPROVED` with failure reasons
+- Chart with shaded IS/OOS regions
+- Reads artefacts from `data/backtests/` to load previous validation runs
+
+**5.5 — Backtest comparison across instruments (REQ-OPS-005)**
+Add "Compare Instruments" mode to Backtests page. Multi-select instruments. Same strategy config applied to all. Results table: instrument, total return, CAGR, Sharpe, drawdown, win rate, trades. Best performer highlighted. Each row expandable to show equity curve.
 
 ---
 
 ### Step 6 — Phase 1 Close (1 day)
 
-- Run full test suite; all tests pass
-- Run `scripts/ingest_market_data.py` against all five commodity instruments; verify curated files on disk
-- Open dashboard; verify signal table renders with real data
-- Run one backtest from the UI; verify summary JSON and trades Parquet written to `data/backtests/`
-- Verify LLM explanation renders for at least one non-neutral signal
-- Record decision on execution price assumption (next-bar close) in `engine.py` docstring
-- Record decision to remove `backtrader` in `docs/requirements.md` (GAP-007 resolved)
+- Run full test suite; all tests pass; line coverage ≥ 80% on `src/` excluding `execution/ig.py`
+- Run `scripts/ingest_market_data.py` against all five instruments; verify curated files on disk
+- Run `scripts/run_signals.py`; verify portfolio snapshot, explanations, and decisions written to disk
+- Open dashboard; verify signal table renders with real data, LLM explanations, LLM decisions, session badges, market context
+- Run one in-sample backtest and one out-of-sample backtest from the UI; verify artefacts written and validation panel renders correctly
+- Confirm dark mode active (`streamlit/config.toml`)
+- Confirm `logs/audit.log` contains entries for signal generation and LLM calls
+- Update `instruments.yaml` with `session_open`, `session_close` for all five instruments
 
 ---
 
-## 5. Phase 2 Build Order
+## 4. Phase 2 — IG Demo Account
 
-Phase 2 starts only after all Phase 1 acceptance criteria pass. No Phase 2 code merges until Phase 1 is stable.
+Phase 2 starts only after all Phase 1 acceptance criteria pass and at least one strategy has passed REQ-VAL-004 (out-of-sample approval thresholds). No Phase 2 code merges until Phase 1 is stable.
 
 ### Prerequisites
-
 - All Phase 1 tests passing
-- IG demo account credentials obtained and in `.env`
-- IG epic codes identified for all five commodity instruments and added to `instruments.yaml`
-- `IG_ENVIRONMENT` set to `demo` in `.env`
+- IG demo account credentials in `.env`
+- IG epic codes for all five instruments added to `instruments.yaml`
+- `IG_ENVIRONMENT=demo` in `.env`
 
 ---
 
 ### Step 1 — IG API Authentication (2 days)
 
 **1.1 — Environment config**
-Add to `.env.example` (not `.env`): `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_ENVIRONMENT`. Add to `config/environments/local.yaml`: `ig.retry_attempts: 3`, `ig.retry_backoff_base: 2`, `ig.timeout_seconds: 30`.
+Add to `.env.example`: `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_ENVIRONMENT`. Add to `config/environments/local.yaml`: `ig.retry_attempts: 3`, `ig.retry_backoff_base: 2`, `ig.timeout_seconds: 30`.
 
-**1.2 — IG adapter implementation**
-Implement `IgBrokerAdapter` in `execution/ig.py`: `connect()`, `place_order()`, `get_positions()`, `close_position()`. Implement session token management and refresh. Add `IGAPIError`, `IGConnectionError`, `AuthenticationError`, `EnvironmentMismatchError` to `exceptions.py`. All API calls log request and response (credentials redacted) to `logs/orders.log` via a dedicated logger.
+**1.2 — IgBrokerAdapter implementation**
+Implement `execution/ig.py` `IgBrokerAdapter`: `connect()`, `place_order()`, `get_positions()`, `close_position()`. Session token management and refresh. Add `IGAPIError`, `IGConnectionError`, `AuthenticationError`, `EnvironmentMismatchError` to `exceptions.py`. All API calls log request/response to `logs/orders.log` (credentials redacted) via a dedicated logger.
 
 **1.3 — Environment isolation guard**
-`IgBrokerAdapter` reads `IG_ENVIRONMENT` at init. `place_order` raises `EnvironmentMismatchError` if the adapter's environment does not match the endpoint being called. This cannot be overridden at call time.
+`IgBrokerAdapter` reads `IG_ENVIRONMENT` at init. `place_order` raises `EnvironmentMismatchError` if adapter environment does not match endpoint. Cannot be overridden at call time.
 
-**1.4 — Tests**
-Use a `responses` or `httpretty` library to mock HTTP calls. Test authentication success/failure, retry behaviour, 429 rate limit handling, environment mismatch guard.
+**1.4 — IG client sentiment (REQ-SENT-001 to REQ-SENT-003)**
+Add `get_client_sentiment(epic: str) -> IGSentiment | None` to `IgBrokerAdapter`. Returns `IGSentiment(long_pct, short_pct, fetch_timestamp)` or `None` on error. Validates `long_pct + short_pct ≈ 100`. Persist to `data/signals/market_context_<symbol>_<YYYYMMDD>.json` extending the existing Phase 1 `MarketContext` schema. Update `MarketContext.ig_sentiment` field (was always `None` in Phase 1).
+
+Update `ExplanationService` and `DecisionService` prompts to include IG client sentiment context with the required labelling: `"IG retail client positioning (note: this reflects IG retail clients only, not the full market)"`.
+
+**1.5 — Tests**
+Mock HTTP with `responses` library. Test auth success/failure, 429 rate limit retry, environment mismatch guard, sentiment validation (`long + short ≠ 100` raises `DataQualityError`).
 
 ---
 
 ### Step 2 — Signal State Management (2 days)
 
-**2.1 — Signal lifecycle model**
-Create `src/trading_lab/signals/state.py`. Define `SignalStatus` enum: `pending`, `approved`, `rejected`, `expired`. Define `SignalRecord` dataclass matching the schema in Section 7. Implement `SignalStore` backed by `data/journal/signals.parquet`: `add_signal()`, `get_pending()`, `update_status()`, `expire_stale()` (moves signals older than `signal_expiry_hours` to `expired`).
+**2.1 — Signal lifecycle**
+Create `src/trading_lab/signals/state.py`. `SignalStatus` enum: `pending`, `approved`, `rejected`, `expired`. `SignalRecord` dataclass per interface in Section 6. `SignalStore` backed by `data/journal/signals.parquet`: `add_signal()`, `get_pending()`, `update_status()`, `expire_stale()`.
 
-**2.2 — Supersession logic**
-When a new signal fires for an instrument that already has a `pending` signal, the existing pending signal transitions to `expired` before the new one is written.
+**2.2 — Supersession**
+New signal for an instrument with an existing `pending` signal: transition existing to `expired` before adding new.
 
-**2.3 — Signal runner integration**
-Update `signals/runner.py` to call `SignalStore.add_signal()` for any new signal where `position_change != 0`. Signals where `position_change == 0` (no change from prior bar) are not added as new pending signals.
+**2.3 — Run_signals integration**
+Update `scripts/run_signals.py` to call `SignalStore.add_signal()` for any new signal where `position_change != 0`.
+
+**2.4 — Push notifications (REQ-OPS-003)**
+Create `src/trading_lab/notifications.py`. `notify_signal(signal_context: SignalContext)`. Reads `PUSH_NOTIFICATION_URL` from env (ntfy.sh or Pushover). Enabled/disabled via `config/environments/local.yaml` `notifications.enabled`. On failure: log WARNING, do not propagate. Test: when `enabled=false`, no HTTP call is made.
 
 ---
 
 ### Step 3 — Position Sizer (1 day)
 
-**3.1**
-Create `src/trading_lab/execution/position_sizer.py`. Implement `calculate_position_size(account_balance, risk_pct, entry_price, stop_loss_price) -> int` (rounds down to nearest whole contract). `risk_pct` comes from `config/environments/local.yaml` `risk.risk_per_trade_pct`, defaulting to 1%. If the strategy does not emit a stop level, fall back to `entry_price * (1 - risk.default_stop_pct)`.
+Create `src/trading_lab/execution/position_sizer.py`. `calculate_position_size(account_balance, risk_pct, entry_price, stop_loss_price) -> int`. Rounds down. Falls back to `entry_price * (1 - default_stop_pct)` if strategy emits no stop level. Tests: hand-calculated reference values.
 
 ---
 
 ### Step 4 — Signal Approval and Order Placement (3 days)
 
 **4.1 — Dashboard approval UI**
-Add Approve and Reject buttons to signal rows with `status=pending`. Approve opens a confirmation modal (Plotly/Streamlit dialog) showing instrument, direction, price, suggested size, stop loss, risk/reward. User may override size. Confirm triggers `IgBrokerAdapter.place_order()`. Reject sets status to `rejected`. No double-submit: disable button while order is in flight using `st.session_state`.
+Approve/Reject buttons per pending signal row. Approve opens confirmation modal: instrument, direction, price, suggested size, stop, risk/reward. User may override size. Confirm triggers `IgBrokerAdapter.place_order()`. No double-submit (`st.session_state` guard).
 
 **4.2 — Order submission**
-On confirm: call `IgBrokerAdapter.place_order(OrderRequest(...))`. On IG success: update signal record to `approved`, store `deal_id`, write entry row to `data/journal/trades.parquet`. On IG failure: update signal to `rejected`, surface error message in dashboard.
+On confirm: `IgBrokerAdapter.place_order(OrderRequest(...))`. On success: update signal to `approved`, store `deal_id`, write entry to `data/journal/trades.parquet`. On failure: signal to `rejected`, surface error in dashboard.
 
 **4.3 — Environment banner**
-Persistent sidebar banner: `DEMO ACCOUNT` (blue) or `LIVE ACCOUNT — REAL MONEY` (red). Rendered on all pages.
+Persistent sidebar: `DEMO ACCOUNT` (blue) or `LIVE ACCOUNT — REAL MONEY` (red). All pages.
 
 ---
 
 ### Step 5 — IG Streaming and Position Monitoring (2-3 days)
 
 **5.1 — Streaming adapter**
-Create `src/trading_lab/execution/ig_streaming.py` wrapping the IG Streaming API (Lightstreamer). Subscribe to OHLC candles for watchlist instruments. Write updates to `data/live/<symbol>_1d_ig_streaming.parquet`. Reconnection logic: up to 5 attempts with exponential backoff. After 5 failures: surface `CONNECTION LOST` alert in dashboard.
+Create `execution/ig_streaming.py`. Subscribe to OHLC candles for watchlist. Write to `data/live/<symbol>_1d_ig_streaming.parquet`. Reconnection: 5 attempts with exponential backoff. After 5 failures: `CONNECTION LOST` alert in dashboard.
 
 **5.2 — Positions panel**
-Add positions panel to Dashboard page. Calls `IgBrokerAdapter.get_positions()` on each manual refresh. Shows: instrument, direction, size, open price, current price (from streaming if connected, else last bar), unrealised P&L, stop level. Cache last successful response; display staleness indicator on stale data.
+Calls `IgBrokerAdapter.get_positions()` on each manual refresh. Shows: instrument, direction, size, open price, current price, unrealised P&L, stop level. Cache last successful response; staleness indicator on stale data.
 
 **5.3 — Exit detection**
-On each positions refresh, compare current open positions against positions cached from prior refresh. Positions that have disappeared are closed. Retrieve deal details from IG REST API and write exit row to `data/journal/trades.parquet`.
+On each positions refresh, compare against prior cache. Disappeared positions are closed. Retrieve deal details and write exit row to `data/journal/trades.parquet`.
 
 ---
 
-### Step 6 — Trade Journal and Signal History UI (1-2 days)
+### Step 6 — Exit Monitor (2 days)
 
-**6.1 — Journal page**
-Create `app/pages/journal.py` with two tabs: Trades and Signals. Trades tab: filterable table + running P&L curve. Signals tab: filterable table + approve/reject rate summary metric.
+Implements REQ-EXIT-002 to REQ-EXIT-006.
 
-**6.2 — Tests**
-Test signal lifecycle transitions. Test that a second pending signal supersedes the first. Test that an expired signal cannot be approved. Test position sizer formula against hand-calculated reference.
+Create `src/trading_lab/execution/exit_monitor.py`. For each open position, evaluate five exit conditions on each refresh: stop hit, target hit, opposite signal, signal age > `max_signal_age_days`, RSI extreme. Generate `CLOSE` recommendation on any trigger. Persist to `data/journal/signals.parquet`. Deduplicate: one active CLOSE recommendation per open position. Dashboard: CLOSE recommendations displayed above signal table as warning cards.
 
 ---
 
-### Step 7 — Phase 2 Close
+### Step 7 — Trade Journal and Risk Display (1-2 days)
+
+**7.1 — Journal page**
+Create `app/pages/journal.py`. Two tabs: Trades and Signals. Trades tab: filterable table, running P&L curve. Signals tab: filterable table, approve/reject rate summary.
+
+**7.2 — Risk display (REQ-RISK-001, REQ-RISK-002)**
+Now that position state exists, implement the deferred Phase 1 risk display requirements. Daily loss limit warning banner. Maximum positions warning banner. Both read from `data/journal/trades.parquet`.
+
+---
+
+### Step 8 — Phase 2 Close
 
 - 30 days of paper trading on demo account with no critical defects
 - All Phase 2 tests pass
-- Order audit log (`logs/orders.log`) reviewed for completeness
-- Kill switch tested on demo account (close all demo positions with one action)
+- Order audit log reviewed for completeness
+- Kill switch tested on demo account (close all demo positions in one action — see Phase 3 Step 2 but test on demo first)
 - `docs/risk-review.md` created and signed off
 
 ---
 
-## 6. Phase 3 Build Order
+## 5. Phase 3 — IG Live Account
 
 Phase 3 starts only after `docs/risk-review.md` is completed and signed off.
 
-### Step 1 — Risk Controls (2 days)
+### Step 1 — Pre-Execution Risk Controls (2 days)
 
-**1.1 — Pre-submission risk check**
-Create `src/trading_lab/execution/risk_checks.py`. Implement `check_pre_submission(order, account_state, config) -> RiskCheckResult`. Checks run in order: daily loss limit, total exposure cap, per-instrument duplicate position, stop loss presence. Each failed check returns a descriptive reason. `IgBrokerAdapter.place_order()` calls this before making the API call; a failed check raises `RiskCheckError`.
+Create `src/trading_lab/execution/risk_checks.py`. `check_pre_submission(order, account_state, config) -> RiskCheckResult`. Checks in order: daily loss limit, total exposure cap, per-instrument duplicate position, stop loss presence. Each failed check returns a descriptive reason. `IgBrokerAdapter.place_order()` calls this before the API call; a failed check raises `RiskCheckError`.
 
-**1.2 — Risk config**
-Add to `config/environments/local.yaml`:
+Risk config in `config/environments/local.yaml`:
 ```yaml
 risk:
   daily_loss_limit_pct: 3.0
@@ -681,35 +631,31 @@ risk:
   risk_per_trade_pct: 1.0
   default_stop_pct: 0.02
 ```
-All values validated at startup. `daily_loss_limit_pct > 50` is rejected as unsafe.
+`daily_loss_limit_pct > 50` rejected as unsafe at startup.
 
 ---
 
 ### Step 2 — Kill Switch (1 day)
 
-**2.1**
-Create `src/trading_lab/execution/kill_switch.py`. `activate()` iterates all open positions, calls `close_position()` for each, logs each closure to `logs/orders.log`. Sets application-level `halted` flag in `st.session_state` that prevents `place_order()` from being called. Cleared only by restarting the application.
-
-**2.2 — Dashboard UI**
-Kill Switch button visible on all pages when `IG_ENVIRONMENT=live`. Opens confirmation modal. After activation, displays countdown and per-position closure status. All Approve buttons disabled while `halted=True`.
+Create `src/trading_lab/execution/kill_switch.py`. `activate()` iterates all open positions, calls `close_position()` for each, logs each closure to `logs/orders.log`. Sets `halted` flag in `st.session_state`; prevents `place_order()`. Cleared only on application restart. Dashboard: kill switch button visible on all pages when `IG_ENVIRONMENT=live`. Confirmation modal. All Approve buttons disabled while `halted=True`.
 
 ---
 
 ### Step 3 — Credential Switch to Live (0.5 days)
 
-The adapter already uses `IG_ENVIRONMENT` to select the endpoint. The only action required is updating `.env` to `IG_ENVIRONMENT=live` and providing live credentials. Test that the startup sequence logs a WARNING at the first line when live. Test that the environment banner renders in red.
+Update `.env` to `IG_ENVIRONMENT=live` with live credentials. Verify startup logs a WARNING at the first line. Verify environment banner renders in red.
 
 ---
 
-### Step 4 — Indices Expansion (1 day)
+### Step 4 — Forex and Indices Expansion (1 day)
 
-Add index instruments to `instruments.yaml` with `asset_class: index` and their IG epics. Signal table groups instruments by `asset_class`. No code changes required if the data layer and strategy layer are correctly built.
+Add index instruments (Phase 2) and forex instruments (Phase 3) to `instruments.yaml` with `asset_class: index` or `asset_class: fx` and their IG epics. Signal table groups instruments by `asset_class`. No code changes required if the data and strategy layers are built correctly.
 
 ---
 
-### Step 5 — Actual vs Backtest Comparison (1-2 days)
+### Step 5 — Actual vs Backtest Performance (1-2 days)
 
-Implement `src/trading_lab/reporting/performance_comparison.py`. For instruments with at least 5 completed live trades: compute actual win rate, average return, Sharpe vs the corresponding backtest result. Display in a new Journal page tab. Highlight divergences > 20%.
+Create `src/trading_lab/reporting/performance_comparison.py`. For instruments with ≥ 5 completed live trades: compute actual win rate, average return, Sharpe vs corresponding backtest result. Display in a new Journal page tab. Highlight divergences > 20%.
 
 ---
 
@@ -722,11 +668,9 @@ Implement `src/trading_lab/reporting/performance_comparison.py`. For instruments
 
 ---
 
-## 7. Interface Definitions
+## 6. Interface Definitions
 
 ### Curated Bar Schema
-
-Every curated Parquet file must conform to this schema. Any consumer that reads a curated file must validate against it.
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -736,63 +680,83 @@ Every curated Parquet file must conform to this schema. Any consumer that reads 
 | low | float64 | <= open |
 | close | float64 | > 0, non-null |
 | volume | float64 | >= 0 |
-| symbol | str | Non-null, matches MarketDataRequest.symbol |
+| symbol | str | Non-null |
 | source | str | Non-null, e.g. "yfinance" |
-| adjusted | bool | Non-null, from MarketDataRequest.adjusted |
+| adjusted | bool | Non-null |
 
-### Signal Schema
+### Signal Schema (output of `Strategy.generate_signals`)
 
-The DataFrame returned by any `Strategy.generate_signals()` call.
-
-| Column | Type | Constraints |
+| Column | Type | Notes |
 |---|---|---|
-| timestamp | datetime64[ns, UTC] | From input bars |
-| open | float64 | From input bars |
-| high | float64 | From input bars |
-| low | float64 | From input bars |
-| close | float64 | From input bars |
-| signal | int8 | Must be in {-1, 0, 1} |
-| position_change | int8 | 1 on long entry, -1 on exit/short entry, 0 otherwise |
-| fast_sma | float64 | Strategy-specific; NaN during warmup |
-| slow_sma | float64 | Strategy-specific; NaN during warmup |
-| rsi | float64 | Present when RSI filter enabled; NaN during warmup |
+| timestamp | DatetimeIndex | UTC-aware |
+| open, high, low, close | float64 | From input bars |
+| signal | int8 | {-1, 0, 1} |
+| position_change | int8 | 1 on entry, -1 on exit, 0 otherwise |
+| fast_sma, slow_sma | float64 | NaN during warmup |
+| rsi | float64 | NaN during warmup |
+| atr_value, rolling_avg_atr | float64 | NaN during warmup |
+| signal_strength_pct | float64 | SMA gap as % |
+| confidence_score | int | 0–100; 0 for flat signals |
+| conflicting_indicators | bool | |
+| high_volatility | bool | |
+| stop_loss_level | float64 | NaN for flat |
+| take_profit_level | float64 | NaN for flat |
+| stop_distance | float64 | NaN for flat |
 
-### BacktestConfig Schema
+### SignalContext (LLM input)
 
 ```python
 @dataclass(frozen=True)
-class BacktestConfig:
+class SignalContext:
     symbol: str
-    timeframe: str               # "1d" or "1wk"
-    start_date: date
-    end_date: date               # must be > start_date
-    strategy_name: str
-    strategy_params: dict
-    initial_cash: float = 100_000.0
-    commission_bps: float = 5.0
-    slippage_bps: float = 2.0
-    risk_free_rate: float = 0.0
+    instrument_name: str
+    signal_date: date
+    signal: int
+    signal_direction: str        # "LONG" or "SHORT"
+    close: float
+    fast_sma: float
+    slow_sma: float
+    rsi: float
+    recent_trend_summary: str
+    stop_loss_level: float
+    take_profit_level: float
+    risk_reward_ratio: float
+    confidence_score: int
+    conflicting_indicators: bool
+    high_volatility: bool
+    news_headlines: list[dict]   # [{title, source, timestamp}]
 ```
 
-### BacktestResult Schema
+### MarketContext (Section 11 aggregator)
+
+```python
+@dataclass
+class MarketContext:
+    symbol: str
+    as_of: datetime
+    session_open: bool
+    upcoming_events: list[dict]      # high-impact events within 5 days
+    news_headlines: list[dict]       # same as SignalContext.news_headlines
+    ig_sentiment: IGSentiment | None # None in Phase 1
+```
+
+### LLMDecision (Section 11 output)
 
 ```python
 @dataclass(frozen=True)
-class BacktestResult:
-    config: BacktestConfig
-    total_return: float
-    cagr: float
-    sharpe_ratio: float
-    max_drawdown: float
-    max_drawdown_duration: int
-    win_rate: float | None
-    num_trades: int
-    avg_trade_return: float | None
-    profit_factor: float | None
-    run_timestamp: datetime
+class LLMDecision:
+    symbol: str
+    signal_date: date
+    signal: int
+    llm_recommendation: str      # "GO", "NO_GO", "UNCERTAIN"
+    rationale: str               # 1-3 sentences
+    conflicts_with_technical: bool
+    generated_at: datetime
+    model: str
+    cached: bool
 ```
 
-### SignalRecord Schema (Phase 2)
+### SignalRecord (Phase 2 signal store)
 
 ```python
 @dataclass
@@ -807,180 +771,94 @@ class SignalRecord:
     rsi: float | None
     status: SignalStatus         # pending | approved | rejected | expired
     timestamp_actioned: datetime | None
-    deal_id: str | None          # set on approval if IG confirms
+    deal_id: str | None
 ```
 
-### TradeRecord Schema (Phase 2)
-
-```python
-@dataclass
-class TradeRecord:
-    trade_id: str
-    symbol: str
-    direction: str               # "BUY" or "SELL"
-    entry_timestamp: datetime
-    entry_price: float
-    exit_timestamp: datetime | None
-    exit_price: float | None
-    size: float
-    gross_return: float | None
-    cost: float | None
-    net_return: float | None
-    stop_level: float
-    signal_id: str
-    approved_by: str             # always "manual" in Phase 2-3
-    notes: str | None
-```
-
-### SignalExplanation Schema (LLM layer)
-
-```python
-@dataclass(frozen=True)
-class SignalExplanation:
-    symbol: str
-    signal_date: date
-    signal: int
-    explanation: str
-    generated_at: datetime
-    model: str
-    cached: bool
-```
-
-### OrderRequest Schema
+### OrderRequest (Phase 2 execution)
 
 ```python
 @dataclass(frozen=True)
 class OrderRequest:
     symbol: str
-    ig_epic: str                 # required from instruments.yaml
+    ig_epic: str
     side: str                    # "BUY" or "SELL"
     size: float
-    stop_loss: float             # required; no order without a stop
-    signal_id: str               # for audit trail linkage
+    stop_loss: float             # required; raises ValidationError if absent
+    signal_id: str
 ```
 
 ---
 
-## 8. Configuration Design
+## 7. Configuration Design
 
-### What Goes in Which File
+### instruments.yaml additions (Phase 1 Step 4)
 
-**`config/instruments.yaml`** — instrument registry and watchlist
-Contains: `symbol`, `name`, `asset_class`, `timeframe`, `source`, `session_timezone`, `adjusted_prices`, `ig_epic` (Phase 2)
-Does not contain: API keys, credentials, risk limits, strategy parameters
+Each instrument entry must add `session_open` and `session_close` (HH:MM in `session_timezone`):
+```yaml
+- symbol: "GC=F"
+  name: Gold Futures
+  asset_class: commodity
+  timeframe: 1d
+  source: yfinance
+  session_timezone: America/New_York
+  session_open: "18:00"
+  session_close: "17:00"
+  adjusted_prices: true
+  # ig_epic: CS.D.GOLD.CFD.IP   # required for Phase 2
+```
 
-**`config/strategies/sma_cross.yaml`** — strategy parameters
-Contains: `strategy` (class name), `params` (all constructor arguments), `backtest` (default `initial_cash`, `commission_bps`, `slippage_bps`)
-Does not contain: date ranges (specified at backtest runtime), credentials
+### local.yaml additions
 
-**`config/environments/local.yaml`** — operational configuration
-Contains: `default_data_source`, `timezone`, data directory paths, `ig` retry/timeout settings, `llm` provider/model/timeout, `risk` parameters (Phase 2+), `signal_expiry_hours` (Phase 2)
-Does not contain: API keys, passwords, account IDs
+```yaml
+llm:
+  provider: claude              # or: stub
+  model: claude-sonnet-4-6
+  max_tokens: 500
+  timeout_seconds: 30
 
-**`.env`** — secrets only
-Contains: `ANTHROPIC_API_KEY`, `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_ENVIRONMENT`
-Never committed to version control. `.env.example` contains the key names with empty values.
+notifications:
+  enabled: false
+  # push_url populated from PUSH_NOTIFICATION_URL env var
 
-**`pyproject.toml`** — package metadata, dependencies, tool config
-Contains: package deps, dev deps, `pytest`, `ruff`, `black` configuration
-Does not contain: runtime config, secrets
+account:
+  capital: 10000
 
-### Environment Variable Naming Convention
+risk:
+  daily_loss_limit_pct: 3.0
+  max_exposure_pct: 25.0
+  max_open_positions: 5
+  risk_per_trade_pct: 1.0
+  default_stop_pct: 0.02
+  correlation_warning_threshold: 0.7
 
-All secrets use `UPPER_SNAKE_CASE` with a service prefix: `IG_`, `ANTHROPIC_`.
-All config in YAML uses `lower_snake_case` with section nesting.
-No config value is duplicated between `.env` and YAML.
+signal_expiry_hours: 24         # Phase 2
 
----
-
-## 9. Testing Strategy
-
-### What to Test and at Which Layer
-
-**Unit tests** (`tests/`) — pure functions, no I/O, no network
-All indicator functions, strategy `generate_signals`, backtest metrics, config validation, LLM cache logic, position sizer formula, risk check logic, signal lifecycle transitions. Use synthetic DataFrames with known answers. Fast enough to run on every commit.
-
-**Integration tests** (`tests/integration/`) — file I/O, no network
-Ingest pipeline end-to-end using a fixture Parquet file (not live yfinance). Backtest result persistence (writes and reads files). Signal store persistence (Parquet append). Dashboard signal runner with mock filesystem. These are slower and tagged `@pytest.mark.integration`.
-
-**No live network calls in the test suite.** yfinance calls are mocked using `unittest.mock.patch`. IG API calls are mocked with `responses`. Anthropic API calls use `StubLLMClient`.
-
-**Manual acceptance testing** — human review, not automated
-Dashboard rendering with real data. LLM explanation quality. IG demo order placement and position monitoring. Kill switch behaviour on demo account.
-
-### What Not to Test
-
-- Streamlit page rendering (integration testing Streamlit is painful and low-value; use manual review)
-- yfinance API behaviour (external service; trust it works)
-- IG API behaviour (mock it; test our adapter's response to API responses, not the API itself)
-
-### Test Data Strategy
-
-Keep synthetic test DataFrames in `tests/fixtures/`. These are small (50-100 rows), created programmatically in conftest.py, and have precisely known properties (e.g. a SMA crossover occurs on bar 35).
-
-For integration tests that need realistic data, use a committed fixture file at `tests/fixtures/gc_1d_yfinance_sample.parquet` (100 rows of real Gold futures data). This file is small enough to commit and does not change.
-
-### Coverage Target
-
-Phase 1: 80% line coverage on `src/trading_lab/` excluding `app/` and `execution/ig.py` (the stub).
-Phase 2: 80% coverage on execution adapters with mocked HTTP.
-
-Do not chase 100% coverage. Focus on the calculation paths (metrics, indicators, engine) and the validation paths (config loader, schema validator, signal validator).
+ig:
+  retry_attempts: 3
+  retry_backoff_base: 2
+  timeout_seconds: 30
+```
 
 ---
 
-## 10. Risks and Mitigations
+## 8. Testing Strategy
 
-### Risk 1 — Backtest results are misleading (long/flat engine misrepresenting short signals)
+### Levels
 
-**Current state:** The engine clips `signal=-1` to `0`. Any backtest run today silently ignores sell signals, making a SMA crossover strategy look like a simple buy-and-hold filter.
-**Mitigation:** Fix the engine in Step 0 (before any new work). Add a test that verifies a short position on a falling market produces a positive return. Do not run or share any backtest result until this is fixed.
+**Unit tests** (`tests/`) — pure functions, no I/O, no network. Run on every commit. Target: 80% line coverage on `src/trading_lab/` excluding `execution/ig.py`.
 
-### Risk 2 — Curated data inconsistency across runs (adjusted flag not persisted)
+**Integration tests** (`tests/integration/`) — file I/O permitted, no network. Tagged `@pytest.mark.integration`. Ingest pipeline end-to-end with fixture Parquet. Signal runner with mock filesystem.
 
-**Current state:** The `adjusted` column is absent from curated files. Two curated files for the same symbol may contain different price series (adjusted vs unadjusted) with no way to detect this downstream.
-**Mitigation:** Add `adjusted` to the curated schema in Step 0. Add schema validation that checks this column on read. Consider adding a file-level hash to backtest result metadata so any change to the source data is detectable.
+**No live network calls in the test suite.** yfinance calls mocked via `unittest.mock.patch`. IG API calls mocked with `responses`. Anthropic API calls use `StubLLMClient`.
 
-### Risk 3 — LLM explanation cost and latency degrading dashboard UX
+### Test data
 
-**Risk:** If the LLM is called synchronously on page load for all five instruments with non-neutral signals, the dashboard could be slow and expensive.
-**Mitigation:** The cache-first design in Section 3 ensures LLM is called at most once per signal per day, not on every page load. The dashboard reads from the cache file. New explanations are generated asynchronously (or on a manual refresh action), not on every render. A `StubLLMClient` fallback ensures the dashboard works without an API key.
+Synthetic DataFrames in `tests/conftest.py`: small (50–100 rows), programmatically generated, with precisely known properties (e.g. SMA crossover on bar 35, known RSI value on bar 50).
 
-### Risk 4 — IG demo API differences from live causing false confidence
+Fixture file for integration tests: `tests/fixtures/gc_1d_yfinance_sample.parquet` — 100 rows of committed Gold data, does not change.
 
-**Risk:** IG demo behaves slightly differently from live in edge cases (order rejection rules, position limits, margin calculations). Paper trading success on demo does not guarantee live success.
-**Mitigation:** The 30-day demo trading requirement before Phase 3 is not just a timeline gate — it is intended to surface these discrepancies. Document any observed differences in `docs/risk-review.md`. Be specifically sceptical of demo results for stop loss triggering and margin-related order rejections.
+### Coverage target
 
-### Risk 5 — Single Streamlit process blocking on data refresh
-
-**Risk:** The Streamlit process runs in a single thread. A blocking `ingest_market_data` call during a dashboard refresh will freeze the UI for all users (though this is a single-user system, it will feel unresponsive).
-**Mitigation:** Run the ingest as a subprocess via `subprocess.Popen` from the dashboard refresh button. Use `st.spinner` for feedback. Report completion via a status file written by the subprocess. This avoids making Streamlit multi-threaded.
-
-### Risk 6 — Signal expiry clock drift causing unexpected pending signal loss
-
-**Risk:** In Phase 2, signals expire after 24 hours. If the machine running the dashboard is not running continuously (likely, given this is a local-first system), a signal could expire during a period when the dashboard is not open.
-**Mitigation:** The expiry check runs on startup, not on a background clock. Signals are marked expired based on their `timestamp_generated` relative to `datetime.utcnow()` at startup. This is correct behaviour — a 24-hour-old signal on a daily bar strategy is genuinely stale. Document this explicitly so the user is not surprised.
-
-### Risk 7 — Parquet append semantics creating duplicate records in the journal
-
-**Risk:** `data/journal/signals.parquet` and `data/journal/trades.parquet` are append-only. A crash mid-write or a code bug could write duplicate records.
-**Mitigation:** Use `signal_id` (uuid4) and `trade_id` as primary keys. All reads deduplicate on these keys before aggregation. Writes use a temp-file-then-rename pattern to prevent partial writes. On startup, validate the journal by checking for duplicate IDs and logging a WARNING (not a failure) if any are found.
-
-### Risk 8 — yfinance data quality for commodity futures (roll gaps, missing bars)
-
-**Risk:** Commodity futures tickers in yfinance (e.g. `GC=F`) represent front-month continuous contracts. Roll dates create price discontinuities. Gaps around exchange holidays may cause unexpected NaN or missing bars.
-**Mitigation:** The data validation in Step 1 (REQ-DATA-005) checks for gaps but does not fail on them — it logs a WARNING. Strategies use rolling calculations on close prices, so a single missing bar does not invalidate a signal. Document that commodity signals should be reviewed against known roll calendar dates before acting.
-
-### Risk 9 — Accidental live order placement during development
-
-**Risk:** In Phase 2+, a code path exercised during development could reach `IgBrokerAdapter.place_order()` with live credentials.
-**Mitigation:** Three-layer guard: (1) `IG_ENVIRONMENT` enforced at adapter init; (2) the environment banner makes the current mode visually unambiguous; (3) no Phase 2 code is added to the `main` branch until Phase 1 is complete, and `IG_ENVIRONMENT=live` is only ever set intentionally. The test suite always uses a mocked adapter, never a live one.
-
-### Risk 10 — Dashboard state management complexity as Phase 2 features accumulate
-
-**Risk:** Streamlit's session state model is simple but becomes difficult to reason about when approval workflows, background polling, and position state all interact in the same session.
-**Mitigation:** Isolate state. Signal state lives in `data/journal/signals.parquet` (disk), not in `st.session_state` (which is page-load-scoped). Position state is fetched from IG on refresh, cached to a file, displayed from that file. Session state is used only for transient UI state (modal open/closed, button disabled). This makes the dashboard stateless between refreshes and resilient to page reloads.
-
----
-
-*End of Build Plan — v1.0*
+Phase 1: 80% on `src/trading_lab/` excluding `execution/ig.py`.
+Phase 2: 80% on execution adapters with mocked HTTP.
+Do not chase 100%. Focus on: calculation paths (metrics, indicators, engine), validation paths (config loader, schema validator, signal validator), LLM cache logic, signal lifecycle transitions.

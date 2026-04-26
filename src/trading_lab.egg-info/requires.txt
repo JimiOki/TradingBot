@@ -1,0 +1,13 @@
+anthropic
+matplotlib
+numpy
+pandas
+plotly
+pyarrow
+pytest
+pytest-cov
+python-dotenv
+requests
+streamlit
+ta
+yfinance

@@ -50,12 +50,16 @@ def normalize_yfinance_daily(
     else:
         df.columns = [col.lower() for col in df.columns]
 
-    # Rename yfinance column variants to canonical names
-    rename_map = {
-        "adj close": "close",
-        "adj_close": "close",
-    }
-    df = df.rename(columns=rename_map)
+    # If both 'close' and 'adj close' exist, drop whichever is not needed.
+    # When adjusted=True, use 'adj close' as the canonical close price.
+    # When adjusted=False, keep 'close' and drop 'adj close'.
+    if "adj close" in df.columns or "adj_close" in df.columns:
+        adj_col = "adj close" if "adj close" in df.columns else "adj_close"
+        if adjusted:
+            df = df.drop(columns=["close"], errors="ignore")
+            df = df.rename(columns={adj_col: "close"})
+        else:
+            df = df.drop(columns=[adj_col], errors="ignore")
 
     required = {"open", "high", "low", "close", "volume"}
     missing = required - set(df.columns)
@@ -80,7 +84,8 @@ def normalize_yfinance_daily(
     df = df[CURATED_COLUMNS]
 
     # Sort chronologically and drop duplicates
-    df = df.sort_index().loc[~df.index.duplicated(keep="last")]
+    df = df.sort_index()
+    df = df.loc[~df.index.duplicated(keep="last")]
 
     logger.debug("Normalised %d bars for %s (adjusted=%s)", len(df), symbol, adjusted)
     return df

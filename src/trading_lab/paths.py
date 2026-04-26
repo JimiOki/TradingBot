@@ -21,6 +21,7 @@ CURATED_DATA_DIR = DATA_DIR / "curated"
 FEATURES_DATA_DIR = DATA_DIR / "features"
 SIGNALS_DATA_DIR = DATA_DIR / "signals"
 EXPLANATIONS_DIR = DATA_DIR / "signals" / "explanations"
+DECISIONS_DIR = DATA_DIR / "signals" / "decisions"
 BACKTEST_DATA_DIR = DATA_DIR / "backtests"
 JOURNAL_DIR = DATA_DIR / "journal"
 CALENDAR_DIR = DATA_DIR / "calendar"
@@ -40,6 +41,7 @@ _REQUIRED_DIRS = [
     FEATURES_DATA_DIR,
     SIGNALS_DATA_DIR,
     EXPLANATIONS_DIR,
+    DECISIONS_DIR,
     BACKTEST_DATA_DIR,
     JOURNAL_DIR,
     CALENDAR_DIR,

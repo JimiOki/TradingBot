@@ -39,3 +39,34 @@ def ingest_yfinance_daily(request: MarketDataRequest) -> tuple[Path, Path, pd.Da
     curated_df.to_parquet(curated_path, index=False)
 
     return raw_path, curated_path, curated_df
+
+
+def fetch_news(symbol: str, max_headlines: int = 5) -> list[dict]:
+    """Fetch recent news headlines for a symbol via yfinance.
+
+    REQ-LLM-008: News headlines are fetched per instrument and included
+    in SignalContext for LLM explanation and decision generation.
+
+    Args:
+        symbol:        Instrument symbol (e.g. 'GC=F').
+        max_headlines: Maximum number of headlines to return.
+
+    Returns:
+        List of dicts with {title, source, timestamp}. Empty list on error.
+    """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    try:
+        ticker = yf.Ticker(symbol)
+        raw_news = ticker.news or []
+        headlines = []
+        for item in raw_news[:max_headlines]:
+            headlines.append({
+                "title": item.get("title", ""),
+                "source": item.get("publisher", ""),
+                "timestamp": item.get("providerPublishTime", ""),
+            })
+        return headlines
+    except Exception as exc:
+        _log.debug("News fetch failed for %s: %s", symbol, exc)
+        return []

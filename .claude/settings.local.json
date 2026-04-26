@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:labs.ig.com)",
+      "Bash(xmllint:*)"
+    ]
+  }
+}

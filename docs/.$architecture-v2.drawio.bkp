@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1800" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1500" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══════════════════════════════════════════════════════
+         TITLE
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="title" value="Trading Lab — System Architecture v2" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+      <mxGeometry x="100" y="20" width="1660" height="44" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         LEGEND
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="legend_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+      <mxGeometry x="1790" y="80" width="210" height="150" as="geometry" />
+    </mxCell>
+    <mxCell id="legend_title" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="1790" y="86" width="210" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="leg_p1_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="1805" y="114" width="28" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="leg_p1_lbl" value="Phase 1 — solid border" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1840" y="114" width="155" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="leg_p2_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+      <mxGeometry x="1805" y="140" width="28" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="leg_p2_lbl" value="Phase 2 — dashed border" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1840" y="140" width="155" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="leg_p3_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0f0;strokeColor=#cc0000;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+      <mxGeometry x="1805" y="166" width="28" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="leg_p3_lbl" value="Phase 3 — red dashed border" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1840" y="166" width="155" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="leg_p3_lbl2" value="(deferred — live capital)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=9;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="1840" y="184" width="155" height="14" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 1 — EXTERNAL SOURCES  (light blue)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="ext_bg" value="External Sources" style="swimlane;startSize=28;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="100" y="84" width="1660" height="96" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ext_yfinance" value="yfinance&#xa;(OHLCV + news feed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="ext_bg">
+      <mxGeometry x="20" y="34" width="170" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="ext_ig_rest" value="IG REST API&#xa;(orders, positions, account)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="ext_bg">
+      <mxGeometry x="210" y="34" width="180" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="ext_ig_stream" value="IG Streaming API&#xa;(live candles, bid/ask)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="ext_bg">
+      <mxGeometry x="410" y="34" width="180" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="ext_anthropic" value="Anthropic Claude API&#xa;(LLM explanations)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="ext_bg">
+      <mxGeometry x="610" y="34" width="180" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="ext_calendar" value="Economic Calendar&#xa;(RSS / Investing.com)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="ext_bg">
+      <mxGeometry x="810" y="34" width="180" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="ext_push" value="Push Notifications&#xa;(ntfy.sh / Pushover)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="ext_bg">
+      <mxGeometry x="1010" y="34" width="170" height="42" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 2 — DATA LAYER  (green)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="data_bg" value="Data Layer" style="swimlane;startSize=28;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="100" y="250" width="1660" height="96" as="geometry" />
+    </mxCell>
+
+    <mxCell id="data_ingest" value="yfinance_ingest.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="data_bg">
+      <mxGeometry x="20" y="34" width="160" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="data_transforms" value="transforms.py&#xa;(UTC normalise, schema)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="data_bg">
+      <mxGeometry x="200" y="34" width="170" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="data_models" value="models.py&#xa;(MarketDataRequest)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="data_bg">
+      <mxGeometry x="390" y="34" width="160" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="data_raw" value="data/raw/&#xa;&lt;sym&gt;_&lt;interval&gt;_src.parquet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="data_bg">
+      <mxGeometry x="570" y="34" width="175" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="data_curated" value="data/curated/&#xa;(curated bar schema)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="data_bg">
+      <mxGeometry x="765" y="34" width="165" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="data_live" value="data/live/&#xa;(IG Streaming candles)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="data_bg">
+      <mxGeometry x="950" y="34" width="175" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="data_script" value="scripts/ingest_market_data.py&#xa;(daily refresh, idempotent)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="data_bg">
+      <mxGeometry x="1145" y="34" width="200" height="42" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 3 — FEATURES + SIGNAL QUALITY + MARKET CONTEXT  (light green)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="feat_bg" value="Features, Signal Quality &amp; Market Context Layer" style="swimlane;startSize=28;fillColor=#e8f5e9;strokeColor=#4caf50;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="100" y="416" width="1660" height="106" as="geometry" />
+    </mxCell>
+
+    <mxCell id="feat_indicators" value="indicators.py&#xa;(SMA, RSI, MACD, ATR)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#4caf50;fontSize=10;" vertex="1" parent="feat_bg">
+      <mxGeometry x="20" y="32" width="185" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="feat_sl_tp" value="stop_target.py&#xa;(ATR×1.5 stop, R/R take-profit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#4caf50;fontSize=10;" vertex="1" parent="feat_bg">
+      <mxGeometry x="225" y="32" width="210" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="feat_qual" value="signal_quality.py&#xa;(confidence 0–100, strength %, conflict&#xa;flag, HIGH VOLATILITY flag)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#4caf50;fontSize=10;" vertex="1" parent="feat_bg">
+      <mxGeometry x="455" y="24" width="240" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="feat_risk_disp" value="risk_display.py&#xa;(60-day correlation warning,&#xa;position sizing calculator)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#4caf50;fontSize=10;" vertex="1" parent="feat_bg">
+      <mxGeometry x="715" y="24" width="225" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="feat_ctx" value="market_context.py&#xa;(economic calendar warnings,&#xa;session status, signal age / STALE)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#4caf50;fontSize=10;" vertex="1" parent="feat_bg">
+      <mxGeometry x="960" y="24" width="255" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 4 — STRATEGY LAYER  (orange)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="strat_bg" value="Strategy Layer" style="swimlane;startSize=28;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="100" y="592" width="1660" height="106" as="geometry" />
+    </mxCell>
+
+    <mxCell id="strat_base" value="base.py&#xa;(Strategy ABC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="strat_bg">
+      <mxGeometry x="20" y="32" width="160" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="strat_sma" value="sma_cross.py&#xa;(SmaCrossStrategy)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="strat_bg">
+      <mxGeometry x="200" y="32" width="175" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="strat_loader" value="loader.py&#xa;(YAML → strategy instance)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="strat_bg">
+      <mxGeometry x="395" y="32" width="185" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="strat_signals" value="data/signals/&#xa;(snapshot + explanation cache)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="strat_bg">
+      <mxGeometry x="600" y="32" width="185" height="42" as="geometry" />
+    </mxCell>
+    <mxCell id="strat_val" value="validation.py&#xa;(IS/OOS split, parameter lock,&#xa;approval thresholds: Sharpe&gt;0.5, DD&lt;25%)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="strat_bg">
+      <mxGeometry x="805" y="24" width="255" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="strat_runner" value="scripts/run_signals.py&#xa;(portfolio signal snapshot)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="strat_bg">
+      <mxGeometry x="1080" y="32" width="195" height="42" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 5A — LLM EXPLANATION LAYER  (purple)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="llm_bg" value="LLM Explanation Layer" style="swimlane;startSize=28;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="100" y="768" width="800" height="116" as="geometry" />
+    </mxCell>
+
+    <mxCell id="llm_explainer" value="explainer.py&#xa;(SignalExplainer ABC +&#xa;AnthropicSignalExplainer)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="llm_bg">
+      <mxGeometry x="15" y="30" width="195" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="llm_prompt" value="prompts/&#xa;signal_explanation.txt&#xa;(2-part: technical + news)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="llm_bg">
+      <mxGeometry x="225" y="30" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="llm_cache" value="data/signals/explanations/&#xa;&lt;sym&gt;_&lt;date&gt;.json&#xa;(per-day cache, news + SL/TP)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="llm_bg">
+      <mxGeometry x="415" y="30" width="210" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="llm_fallback" value="FakeSignalExplainer&#xa;(test stub — no API calls)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="llm_bg">
+      <mxGeometry x="640" y="30" width="150" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 5B — BACKTESTING & VALIDATION LAYER  (yellow)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="bt_bg" value="Backtesting &amp; Validation Layer" style="swimlane;startSize=28;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="960" y="768" width="800" height="116" as="geometry" />
+    </mxCell>
+
+    <mxCell id="bt_engine" value="engine.py&#xa;(long/flat/short,&#xa;next-bar fill, costs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="bt_bg">
+      <mxGeometry x="15" y="30" width="155" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="bt_metrics" value="metrics.py&#xa;(Sharpe, CAGR, MaxDD,&#xa;win rate, profit factor)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="bt_bg">
+      <mxGeometry x="185" y="30" width="160" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="bt_reporter" value="reporter.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="bt_bg">
+      <mxGeometry x="360" y="30" width="120" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="bt_validation" value="validation.py&#xa;(IS/OOS split, param lock,&#xa;degradation %, OOS gate)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="bt_bg">
+      <mxGeometry x="495" y="30" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="bt_data" value="data/backtests/&#xa;*_in_sample_*.parquet&#xa;*_out_of_sample_*.parquet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="bt_bg">
+      <mxGeometry x="685" y="30" width="100" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 6A — SIGNAL APPROVAL + JOURNAL LAYER (light orange, Phase 2)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="sig_bg" value="Signal Approval &amp; Trade Journal Layer — Phase 2" style="swimlane;startSize=28;fillColor=#fce5cd;strokeColor=#e06c00;fontSize=13;fontStyle=1;horizontal=1;align=center;dashed=1;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="100" y="954" width="800" height="116" as="geometry" />
+    </mxCell>
+
+    <mxCell id="sig_state" value="signal_state.py&#xa;(pending → approved /&#xa;rejected / expired)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce5cd;strokeColor=#e06c00;fontSize=10;dashed=1;" vertex="1" parent="sig_bg">
+      <mxGeometry x="15" y="30" width="185" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="sig_sizer" value="position_sizer.py&#xa;(capital × risk% / stop_dist&#xa;= size units)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce5cd;strokeColor=#e06c00;fontSize=10;dashed=1;" vertex="1" parent="sig_bg">
+      <mxGeometry x="215" y="30" width="185" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="sig_exit" value="exit_monitor.py&#xa;(stop hit, target hit, opposite&#xa;signal, age, RSI extreme)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce5cd;strokeColor=#e06c00;fontSize=10;dashed=1;" vertex="1" parent="sig_bg">
+      <mxGeometry x="415" y="30" width="200" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="sig_journal" value="data/journal/&#xa;trades.parquet&#xa;signals.parquet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce5cd;strokeColor=#e06c00;fontSize=10;dashed=1;" vertex="1" parent="sig_bg">
+      <mxGeometry x="628" y="30" width="155" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 6B — EXECUTION + RISK CONTROLS LAYER  (red)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="exec_bg" value="Execution &amp; Risk Layer" style="swimlane;startSize=28;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="960" y="954" width="800" height="116" as="geometry" />
+    </mxCell>
+
+    <mxCell id="exec_base" value="broker_base.py&#xa;(BrokerAdapter ABC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="exec_bg">
+      <mxGeometry x="15" y="30" width="170" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="exec_ig" value="ig.py&#xa;(IgBrokerAdapter,&#xa;auth, order submit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="exec_bg">
+      <mxGeometry x="200" y="30" width="165" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="exec_ig_stream" value="ig_streaming.py&#xa;(live candles, P&amp;L,&#xa;reconnect × 5)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="exec_bg">
+      <mxGeometry x="380" y="30" width="165" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="exec_risk" value="risk_controls.py&#xa;(loss limit, exposure cap,&#xa;per-instrument limit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="exec_bg">
+      <mxGeometry x="560" y="30" width="175" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="exec_kill" value="Kill Switch&#xa;(close all positions&#xa;in ≤ 60 s)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0f0;strokeColor=#cc0000;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="exec_bg">
+      <mxGeometry x="750" y="30" width="40" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         ROW 7 — APPLICATION LAYER — STREAMLIT  (light purple)
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="app_bg" value="Application Layer — Streamlit (localhost, dark mode)" style="swimlane;startSize=28;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="100" y="1140" width="1660" height="106" as="geometry" />
+    </mxCell>
+
+    <mxCell id="app_main" value="app/main.py&#xa;(nav, session state,&#xa;env banner, last refresh)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=10;" vertex="1" parent="app_bg">
+      <mxGeometry x="15" y="26" width="185" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="app_dashboard" value="pages/dashboard.py&#xa;(signal table, portfolio summary,&#xa;SL/TP, confidence, approve UI)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=10;" vertex="1" parent="app_bg">
+      <mxGeometry x="215" y="26" width="220" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="app_charts" value="pages/charts.py&#xa;(OHLC candlestick, SMA/RSI/MACD&#xa;overlays, signal markers, Plotly)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=10;" vertex="1" parent="app_bg">
+      <mxGeometry x="450" y="26" width="225" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="app_backtests" value="pages/backtests.py&#xa;(run, IS/OOS compare, equity curve,&#xa;trade log, multi-instrument)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=10;" vertex="1" parent="app_bg">
+      <mxGeometry x="690" y="26" width="225" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="app_journal" value="pages/journal.py&#xa;(trades + signal history tabs,&#xa;P&amp;L curve, accept/reject rate)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="app_bg">
+      <mxGeometry x="930" y="26" width="215" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="app_settings" value="pages/settings.py&#xa;(instruments, strategy params,&#xa;env config — no secrets)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=10;" vertex="1" parent="app_bg">
+      <mxGeometry x="1160" y="26" width="215" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="app_positions" value="pages/positions.py&#xa;(open positions, unrealised P&amp;L,&#xa;DEMO / LIVE banner)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8d5f5;strokeColor=#7b4ea6;fontSize=10;dashed=1;strokeWidth=2;" vertex="1" parent="app_bg">
+      <mxGeometry x="1390" y="26" width="215" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════
+         CONFIG LAYER  (grey) — right column spanning all rows
+    ════════════════════════════════════════════════════════ -->
+    <mxCell id="cfg_bg" value="Config Layer" style="swimlane;startSize=28;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=13;fontStyle=1;horizontal=1;align=center;" vertex="1" parent="1">
+      <mxGeometry x="1790" y="250" width="210" height="1000" as="geometry" />
+    </mxCell>
+
+    <mxCell id="cfg_instruments" value="instruments.yaml&#xa;(symbol, ig_epic, asset_class,&#xa;session_tz, adjusted)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="40" width="190" height="46" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_strategies" value="config/strategies/*.yaml&#xa;(fast/slow SMA, RSI, ATR mult,&#xa;R/R ratio, OOS ratio, exit params)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="96" width="190" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_env" value="config/environments/local.yaml&#xa;(capital, risk_per_trade_pct,&#xa;daily_loss_limit, max_positions,&#xa;max_exposure, default_stop_pct)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="158" width="190" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_settings" value="config/settings.yaml&#xa;(notifications.enabled,&#xa;push_url)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="228" width="190" height="46" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_dotenv" value=".env (secrets — never committed)&#xa;IG_API_KEY, IG_USERNAME, IG_PW&#xa;IG_ACCOUNT_ID, IG_ENVIRONMENT&#xa;ANTHROPIC_API_KEY" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="284" width="190" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_streamlit" value=".streamlit/config.toml&#xa;([theme] base = dark)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="354" width="190" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_note" value="Provides configuration to all layers.&#xa;Changes written back by Settings page." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=9;fontStyle=2;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="402" width="190" height="34" as="geometry" />
+    </mxCell>
+
+    <!-- Separator label -->
+    <mxCell id="cfg_ops_label" value="─── Ops &amp; Logging ───" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=10;fontStyle=1;fontColor=#444444;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="446" width="190" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_log_struct" value="logs/ (structured logs)&#xa;timestamp | level | component" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#444444;fontColor=#222222;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="472" width="190" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_log_audit" value="logs/audit.log (JSON-lines)&#xa;signal_generated | approved |&#xa;rejected | llm_call_made | cached" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#444444;fontColor=#222222;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="518" width="190" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_log_orders" value="logs/orders.log&#xa;(full order audit trail,&#xa;creds redacted)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#444444;fontColor=#222222;fontSize=9;dashed=1;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="578" width="190" height="46" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_gitignore" value=".gitignore + pre-commit hook&#xa;(no secrets in VCS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#444444;fontColor=#222222;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="632" width="190" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="cfg_tests" value="tests/ (unit + integration)&#xa;(data, signals, backtest,&#xa;config, LLM stub)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#444444;fontColor=#222222;fontSize=9;" vertex="1" parent="cfg_bg">
+      <mxGeometry x="10" y="678" width="190" height="46" as="geometry" />
+    </mxCell>
+
+
+    <!-- ═══════════════════════════════════════════════════════
+         ARROWS — data flow
+         All edges use parent="1" (absolute coordinates).
+         Waypoints are absolute page coordinates.
+    ════════════════════════════════════════════════════════ -->
+
+    <!-- yfinance → Data Layer -->
+    <mxCell id="arr_yf_data" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" source="ext_yfinance" target="data_bg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- IG Streaming → data/live -->
+    <mxCell id="arr_stream_live" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;strokeWidth=2;dashed=1;" edge="1" source="ext_ig_stream" target="data_live" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Data Layer → Features Layer -->
+    <mxCell id="arr_data_feat" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#82b366;strokeWidth=2;" edge="1" source="data_bg" target="feat_bg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Economic Calendar → market_context (Features) -->
+    <mxCell id="arr_cal_ctx" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#4caf50;strokeWidth=2;" edge="1" source="ext_calendar" target="feat_ctx" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Features Layer → Strategy Layer -->
+    <mxCell id="arr_feat_strat" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;strokeWidth=2;" edge="1" source="feat_bg" target="strat_bg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Strategy Layer → LLM Explanation Layer (left fork) -->
+    <mxCell id="arr_strat_llm" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673a6;strokeWidth=2;" edge="1" source="strat_bg" target="llm_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="380" y="724" />
+          <mxPoint x="380" y="752" />
+          <mxPoint x="300" y="752" />
+          <mxPoint x="300" y="768" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Strategy Layer → Backtesting Layer (right fork) -->
+    <mxCell id="arr_strat_bt" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;strokeWidth=2;" edge="1" source="strat_bg" target="bt_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1380" y="724" />
+          <mxPoint x="1380" y="752" />
+          <mxPoint x="1160" y="752" />
+          <mxPoint x="1160" y="768" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Strategy Layer → Signal Approval Layer (Phase 2, left) -->
+    <mxCell id="arr_strat_sig" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e06c00;strokeWidth=2;dashed=1;" edge="1" source="strat_bg" target="sig_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="350" y="724" />
+          <mxPoint x="350" y="938" />
+          <mxPoint x="300" y="938" />
+          <mxPoint x="300" y="954" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Anthropic Claude API → LLM Explanation Layer -->
+    <mxCell id="arr_claude_llm" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673a6;strokeWidth=2;" edge="1" source="ext_anthropic" target="llm_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="790" y="204" />
+          <mxPoint x="500" y="204" />
+          <mxPoint x="500" y="768" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- IG REST API → Execution Layer (Phase 2, routed right) -->
+    <mxCell id="arr_igrest_exec" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;strokeWidth=2;dashed=1;" edge="1" source="ext_ig_rest" target="exec_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="400" y="200" />
+          <mxPoint x="1770" y="200" />
+          <mxPoint x="1770" y="1012" />
+          <mxPoint x="1660" y="1012" />
+          <mxPoint x="1660" y="1026" />
+          <mxPoint x="1620" y="1026" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Signal Approval → Execution Layer (Phase 2) -->
+    <mxCell id="arr_sig_exec" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;strokeWidth=2;dashed=1;" edge="1" source="sig_bg" target="exec_bg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- LLM Layer → App Layer -->
+    <mxCell id="arr_llm_app" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673a6;strokeWidth=2;" edge="1" source="llm_bg" target="app_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="300" y="904" />
+          <mxPoint x="300" y="1124" />
+          <mxPoint x="325" y="1124" />
+          <mxPoint x="325" y="1140" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Backtesting → App Layer -->
+    <mxCell id="arr_bt_app" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;strokeWidth=2;" edge="1" source="bt_bg" target="app_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1260" y="904" />
+          <mxPoint x="1260" y="1124" />
+          <mxPoint x="802" y="1124" />
+          <mxPoint x="802" y="1140" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Signal Approval → App Layer (Phase 2) -->
+    <mxCell id="arr_sig_app" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e06c00;strokeWidth=2;dashed=1;" edge="1" source="sig_bg" target="app_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="500" y="1090" />
+          <mxPoint x="500" y="1130" />
+          <mxPoint x="560" y="1130" />
+          <mxPoint x="560" y="1140" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Execution → App Layer (Phase 2) -->
+    <mxCell id="arr_exec_app" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;strokeWidth=2;dashed=1;" edge="1" source="exec_bg" target="app_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1360" y="1090" />
+          <mxPoint x="1360" y="1130" />
+          <mxPoint x="1500" y="1130" />
+          <mxPoint x="1500" y="1140" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Strategy signals snapshot → App Layer (signal table reads from disk) -->
+    <mxCell id="arr_strat_app" value="signals snapshot" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;strokeWidth=2;fontStyle=2;fontSize=9;" edge="1" source="strat_signals" target="app_dashboard" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="785" y="660" />
+          <mxPoint x="785" y="1125" />
+          <mxPoint x="325" y="1125" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Config → Strategy (representative config arrow) -->
+    <mxCell id="arr_cfg_strat" value="config" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#666666;strokeWidth=1;dashed=1;fontSize=9;fontStyle=2;endArrow=block;endFill=1;" edge="1" source="cfg_bg" target="strat_bg" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1790" y="645" />
+          <mxPoint x="1765" y="645" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Push notifications ← App (app triggers notification) -->
+    <mxCell id="arr_app_push" value="new signal" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;strokeWidth=2;dashed=1;fontSize=9;fontStyle=2;" edge="1" source="app_dashboard" target="ext_push" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="325" y="1120" />
+          <mxPoint x="325" y="110" />
+          <mxPoint x="1095" y="110" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+  </root>
+</mxGraphModel>

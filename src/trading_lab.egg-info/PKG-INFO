@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: trading-lab
+Version: 0.1.0
+Summary: Local research and execution environment for systematic trading.
+Requires-Python: >=3.11
+Requires-Dist: anthropic
+Requires-Dist: matplotlib
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: plotly
+Requires-Dist: pyarrow
+Requires-Dist: pytest
+Requires-Dist: pytest-cov
+Requires-Dist: python-dotenv
+Requires-Dist: requests
+Requires-Dist: streamlit
+Requires-Dist: ta
+Requires-Dist: yfinance
