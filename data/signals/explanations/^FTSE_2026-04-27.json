@@ -1,0 +1,8 @@
+{
+  "symbol": "^FTSE",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "explanation": "This SHORT signal is technically weak; while the close is below the fast SMA, the RSI is neutral, the EMA crossover is LONG, and overall confidence is only 50%. More critically, the Stop Loss (10180.7781) and Take Profit (10739.0541) levels provided are configured for a LONG trade, not a SHORT, rendering this specific signal fundamentally untradeable as presented. However, the news squarely points to strong bearish headwinds for the FTSE 100, with weak Chinese trade data and declining commodity prices explicitly cited as drivers for \"downward pressure\" on the index. While the macro sentiment from the news strongly supports a bearish outlook for the FTSE, the severe flaw in the signal's execution parameters means *this specific SHORT signal is broken*. We can acknowledge the market's bearish tone, but this signal itself is unusable.",
+  "generated_at": "2026-04-27T09:26:16.117358+00:00",
+  "model": "gemini-2.5-flash"
+}

@@ -36,7 +36,7 @@ def ingest_yfinance_daily(request: MarketDataRequest) -> tuple[Path, Path, pd.Da
     raw_df.to_parquet(raw_path)
 
     curated_df = normalize_yfinance_daily(raw_df, symbol=request.symbol, source=request.source)
-    curated_df.to_parquet(curated_path, index=False)
+    curated_df.to_parquet(curated_path, index=True)
 
     return raw_path, curated_path, curated_df
 

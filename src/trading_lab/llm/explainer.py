@@ -21,7 +21,7 @@ from trading_lab.paths import EXPLANATIONS_DIR
 logger = logging.getLogger(__name__)
 
 EXPLANATION_UNAVAILABLE = "Explanation unavailable."
-_MAX_EXPLANATION_CHARS = 1000
+_MAX_EXPLANATION_CHARS = 2500
 
 
 @dataclass(frozen=True)

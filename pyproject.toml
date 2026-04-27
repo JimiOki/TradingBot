@@ -9,8 +9,10 @@ description = "Local research and execution environment for systematic trading."
 requires-python = ">=3.11"
 dependencies = [
   "anthropic",
+  "google-genai",
   "matplotlib",
   "numpy",
+  "openai",
   "pandas",
   "plotly",
   "pyarrow",
@@ -20,6 +22,7 @@ dependencies = [
   "requests",
   "streamlit",
   "ta",
+  "trading-ig",
   "yfinance",
 ]
 

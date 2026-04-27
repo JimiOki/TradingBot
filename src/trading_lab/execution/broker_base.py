@@ -1,12 +1,15 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
 class OrderRequest:
-    symbol: str
-    side: str
-    quantity: float
+    symbol: str        # yfinance symbol, e.g. "GC=F"
+    side: str          # "BUY" or "SELL"
+    size: float        # £/point for spreadbets
+    epic: str = ""     # IG epic, e.g. "CS.D.CFDGOLD.CFD.IP"
+    stop_distance: float = 0.0   # points from entry
+    limit_distance: float = 0.0  # points from entry
 
 
 class BrokerAdapter(ABC):

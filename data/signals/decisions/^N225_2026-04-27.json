@@ -1,0 +1,10 @@
+{
+  "symbol": "^N225",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "llm_recommendation": "NO_GO",
+  "rationale": "The primary technical signal to SHORT Nikkei 225 is critically undermined by internal inconsistencies and strong external contradictions. The provided stop and target levels are inverted for a short position, rendering the trade parameters invalid. Furthermore, zero independent strategy indicators confirm the short direction, while overwhelming recent news reports the Nikkei hitting fresh record highs and closing above 60000, indicating strong bullish momentum that directly opposes a short trade.",
+  "conflicts_with_technical": true,
+  "generated_at": "2026-04-27T09:28:48.015704+00:00",
+  "model": "gemini-2.5-flash"
+}

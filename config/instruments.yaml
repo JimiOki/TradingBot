@@ -1,5 +1,5 @@
-# Phase 1 instruments — commodities via yfinance
-# ig_epic fields are placeholders — populate before Phase 2
+# Phase 1 instruments — commodities and indices via yfinance
+# ig_epic fields verified against IG API (DFB = undated Daily Funded Bet)
 
 instruments:
   - symbol: "GC=F"
@@ -11,7 +11,8 @@ instruments:
     session_open: "18:00"
     session_close: "17:00"
     adjusted_prices: false
-    ig_epic: null  # TODO: populate before Phase 2
+    ig_epic: "CS.D.USCGC.TODAY.IP"   # Spot Gold, undated DFB
+    ig_sentiment_id: "GOLD"
 
   - symbol: "CL=F"
     name: Crude Oil (WTI)
@@ -22,7 +23,8 @@ instruments:
     session_open: "18:00"
     session_close: "17:00"
     adjusted_prices: false
-    ig_epic: null  # TODO: populate before Phase 2
+    ig_epic: "CC.D.CL.USS.IP"        # Oil - US Crude, undated DFB
+    ig_sentiment_id: "OIL_CRUDE"
 
   - symbol: "SI=F"
     name: Silver
@@ -33,7 +35,8 @@ instruments:
     session_open: "18:00"
     session_close: "17:00"
     adjusted_prices: false
-    ig_epic: null  # TODO: populate before Phase 2
+    ig_epic: "CS.D.USCSI.TODAY.IP"   # Spot Silver, undated DFB
+    ig_sentiment_id: "SILVER"
 
   - symbol: "HG=F"
     name: Copper
@@ -44,7 +47,8 @@ instruments:
     session_open: "18:00"
     session_close: "17:00"
     adjusted_prices: false
-    ig_epic: null  # TODO: populate before Phase 2
+    ig_epic: "CS.D.COPPER.TODAY.IP"  # Copper, undated DFB
+    ig_sentiment_id: "COPPER"
 
   - symbol: "NG=F"
     name: Natural Gas
@@ -55,4 +59,77 @@ instruments:
     session_open: "18:00"
     session_close: "17:00"
     adjusted_prices: false
-    ig_epic: null  # TODO: populate before Phase 2
+    ig_epic: "CC.D.NG.USS.IP"        # Natural Gas, undated DFB
+    ig_sentiment_id: "NATURALGAS"
+
+  - symbol: "^FTSE"
+    name: FTSE 100
+    asset_class: index
+    timeframe: 1d
+    source: yfinance
+    session_timezone: Europe/London
+    session_open: "08:00"
+    session_close: "16:30"
+    adjusted_prices: false
+    ig_epic: "IX.D.FTSE.DAILY.IP"    # FTSE 100, undated DFB
+    ig_sentiment_id: "FTSE"
+
+  - symbol: "^GSPC"
+    name: S&P 500
+    asset_class: index
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "09:30"
+    session_close: "16:00"
+    adjusted_prices: false
+    ig_epic: "IX.D.SPTRD.DAILY.IP"   # US 500, undated DFB
+    ig_sentiment_id: "US500"
+
+  - symbol: "^NDX"
+    name: NASDAQ 100
+    asset_class: index
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "09:30"
+    session_close: "16:00"
+    adjusted_prices: false
+    ig_epic: "IX.D.NASDAQ.CASH.IP"   # US Tech 100, undated DFB
+    ig_sentiment_id: "USTECH"
+
+  - symbol: "^GDAXI"
+    name: DAX 40
+    asset_class: index
+    timeframe: 1d
+    source: yfinance
+    session_timezone: Europe/Berlin
+    session_open: "09:00"
+    session_close: "17:30"
+    adjusted_prices: false
+    ig_epic: "IX.D.DAX.DAILY.IP"     # Germany 40, undated DFB
+    ig_sentiment_id: "DAX"
+
+  - symbol: "^N225"
+    name: Nikkei 225
+    asset_class: index
+    timeframe: 1d
+    source: yfinance
+    session_timezone: Asia/Tokyo
+    session_open: "09:00"
+    session_close: "15:30"
+    adjusted_prices: false
+    ig_epic: "IX.D.NIKKEI.DAILY.IP"  # Japan 225, undated DFB
+    ig_sentiment_id: "NIKKEI"
+
+  - symbol: "^DJI"
+    name: Dow Jones
+    asset_class: index
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "09:30"
+    session_close: "16:00"
+    adjusted_prices: false
+    ig_epic: "IX.D.DOW.DAILY.IP"     # Wall Street, undated DFB
+    ig_sentiment_id: "WALLSTREET"

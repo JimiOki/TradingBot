@@ -1,0 +1,10 @@
+{
+  "symbol": "HG=F",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "llm_recommendation": "NO_GO",
+  "rationale": "The primary technical signal for SHORT is fundamentally flawed, as its specified stop and target values are configured for a LONG trade, rendering it internally contradictory. Furthermore, the technical case for a SHORT is extremely weak, with zero independent strategies agreeing and the trend (close above SMA) indicating an uptrend. News flow does not provide a strong bearish catalyst, and IG client sentiment is overwhelmingly long, conflicting with the short signal. Given these severe issues and lack of corroboration, a NO_GO decision is warranted.",
+  "conflicts_with_technical": true,
+  "generated_at": "2026-04-27T09:25:25.048554+00:00",
+  "model": "gemini-2.5-flash"
+}

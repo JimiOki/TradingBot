@@ -25,9 +25,9 @@ capital:
   daily_loss_limit_pct: 3.0
 
 llm:
-  provider: claude
-  model: claude-opus-4-6
-  max_tokens: 500
+  provider: gemini
+  model: gemini-2.5-flash
+  max_tokens: 8192
   enabled: true
 
 notifications:

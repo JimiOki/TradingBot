@@ -1,7 +1,7 @@
 """SignalContext dataclass — structured input to the LLM layer."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 
@@ -28,19 +28,23 @@ class SignalContext:
     conflicting_indicators: bool
     high_volatility: bool
     news_headlines: list[dict]    # each: {title, source, timestamp}; empty if none
+    strategy_signals: dict        # {"sma_cross": 1, "macd": -1, "bollinger": 0, "donchian": 1, "rsi_reversion": -1}
 
 
 def build_signal_context(
     signal_row: dict,
     instrument: dict,
     news: list[dict],
+    strategy_signals: dict = None,
 ) -> SignalContext:
     """Build a SignalContext from a signal row dict and instrument config dict.
 
     Args:
-        signal_row:  Dict with keys matching the signal schema columns.
-        instrument:  Instrument config dict (from instruments.yaml).
-        news:        List of news headline dicts [{title, source, timestamp}].
+        signal_row:       Dict with keys matching the signal schema columns.
+        instrument:       Instrument config dict (from instruments.yaml).
+        news:             List of news headline dicts [{title, source, timestamp}].
+        strategy_signals: Optional dict mapping strategy name to signal int
+                          (-1, 0, 1). Defaults to empty dict if not provided.
 
     Returns:
         Populated SignalContext ready for the LLM layer.
@@ -79,4 +83,5 @@ def build_signal_context(
         conflicting_indicators=bool(signal_row.get("conflicting_indicators", False)),
         high_volatility=bool(signal_row.get("high_volatility", False)),
         news_headlines=news or [],
+        strategy_signals=strategy_signals if strategy_signals is not None else {},
     )

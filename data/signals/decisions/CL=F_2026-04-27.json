@@ -1,0 +1,10 @@
+{
+  "symbol": "CL=F",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "llm_recommendation": "NO_GO",
+  "rationale": "The technical signal for SHORT is fundamentally flawed, as its provided Stop and Target values with a 2.0x R/R are consistent with a LONG trade, not a SHORT. Furthermore, only 0 out of 6 independent strategies agree with a SHORT direction. This weak and contradictory technical case is overshadowed by recent news headlines, which strongly indicate a bullish sentiment for crude oil due to escalating US-Iran tensions driving prices higher, directly conflicting with a SHORT trade.",
+  "conflicts_with_technical": true,
+  "generated_at": "2026-04-27T09:24:14.426124+00:00",
+  "model": "gemini-2.5-flash"
+}

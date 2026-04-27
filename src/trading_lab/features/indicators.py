@@ -74,3 +74,46 @@ def sma_gap_pct(fast: pd.Series, slow: pd.Series) -> pd.Series:
 def rolling_atr_average(atr_series: pd.Series, window: int = 30) -> pd.Series:
     """Rolling average of ATR. Used to detect high-volatility conditions."""
     return atr_series.rolling(window=window, min_periods=window).mean()
+
+
+def bollinger_bands(series: pd.Series, window: int = 20, num_std: float = 2.0) -> pd.DataFrame:
+    """Bollinger Bands: middle SMA, upper and lower bands.
+
+    Args:
+        series:  Price series (typically close).
+        window:  Look-back window for the SMA and std (default 20).
+        num_std: Number of standard deviations for the bands (default 2.0).
+
+    Returns:
+        DataFrame with columns: upper, middle, lower.
+        Warm-up rows (index < window-1) contain NaN in all columns.
+    """
+    if window < 1:
+        raise ValueError(f"window must be >= 1, got {window}")
+    middle = series.rolling(window=window, min_periods=window).mean()
+    std = series.rolling(window=window, min_periods=window).std(ddof=0)
+    upper = middle + num_std * std
+    lower = middle - num_std * std
+    return pd.DataFrame({"upper": upper, "middle": middle, "lower": lower}, index=series.index)
+
+
+def donchian_channel(high: pd.Series, low: pd.Series, window: int = 20) -> pd.DataFrame:
+    """Donchian Channel: N-period high, low, and mid.
+
+    Args:
+        high:   High price series.
+        low:    Low price series.
+        window: Look-back window (default 20).
+
+    Returns:
+        DataFrame with columns: upper, middle, lower.
+        Warm-up rows (index < window-1) contain NaN in all columns.
+        The upper is the rolling N-day high; lower is the rolling N-day low.
+        Middle is (upper + lower) / 2.
+    """
+    if window < 1:
+        raise ValueError(f"window must be >= 1, got {window}")
+    upper = high.rolling(window=window, min_periods=window).max()
+    lower = low.rolling(window=window, min_periods=window).min()
+    middle = (upper + lower) / 2
+    return pd.DataFrame({"upper": upper, "middle": middle, "lower": lower}, index=high.index)

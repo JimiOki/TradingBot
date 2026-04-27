@@ -1,0 +1,19 @@
+strategy: bollinger
+params:
+  bb_window: 20
+  num_std: 2.0
+  mode: breakout
+  rsi_window: 14
+  rsi_overbought: 70.0
+  rsi_oversold: 30.0
+  atr_window: 14
+  atr_multiplier: 1.5
+  risk_reward_ratio: 2.0
+validation:
+  oos_ratio: 0.30
+exit:
+  max_signal_age_days: 10
+backtest:
+  initial_cash: 100000
+  commission_bps: 5
+  slippage_bps: 2

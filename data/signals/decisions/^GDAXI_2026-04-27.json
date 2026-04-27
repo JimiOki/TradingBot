@@ -1,0 +1,10 @@
+{
+  "symbol": "^GDAXI",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "rationale": "Despite a weak technical consensus with only 1 of 6 strategies agreeing on a SHORT direction, recent news provides a strong bearish catalyst. Headlines from April 27th explicitly state the DAX is 'experiencing significant drops,' supported by earlier reports of 'deepening economic woes' and the 'Strait of Hormuz Remaining Closed,' which are significant macro headwinds. This strong, current market sentiment overrides the weak technical agreement and an older, conflicting bullish news item.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-27T09:28:12.945313+00:00",
+  "model": "gemini-2.5-flash"
+}

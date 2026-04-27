@@ -39,6 +39,8 @@ class AuditAction:
     LLM_CALL_MADE = "llm_call_made"
     LLM_CALL_CACHED = "llm_call_cached"
     LLM_CALL_FAILED = "llm_call_failed"
+    ORDER_PLACED = "order_placed"
+    ORDER_SKIPPED = "order_skipped"
 
     _ALL = {
         SIGNAL_GENERATED,
@@ -47,6 +49,8 @@ class AuditAction:
         LLM_CALL_MADE,
         LLM_CALL_CACHED,
         LLM_CALL_FAILED,
+        ORDER_PLACED,
+        ORDER_SKIPPED,
     }
 
     @classmethod

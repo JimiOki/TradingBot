@@ -1,8 +1,9 @@
 # Trading Lab — Architecture
 
-**Version:** 2.0
-**Date:** 2026-04-03
+**Version:** 2.1
+**Date:** 2026-04-26
 **Status:** Active — supersedes the original `ARCHITECTURE.md`
+**Updated:** Multi-LLM provider support (Gemini default), Phase 4 Automated Execution added.
 **Informed by:** `docs/requirements.md`, `docs/build-plan.md`, codebase audit (2026-04-03)
 
 ---
@@ -92,20 +93,25 @@ Layers communicate via DataFrames passed as arguments and Parquet files on disk.
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │                              EXTERNAL SOURCES                                  │
 │                                                                                │
-│   yfinance           IG REST API        IG Streaming API    Anthropic Claude   │
-│   (research data)    (orders, positions) (live candles)     (LLM explanations) │
+│   yfinance           IG REST API        IG Streaming API    LLM Providers      │
+│   (research data)    (orders, positions) (live candles)     (Gemini·DS·OAI·CL) │
 │                                                                                │
 │   News / Economic Calendar (context only — no automated feed in Phase 1-2)    │
 └───────┬──────────────────┬─────────────────┬──────────────────┬───────────────┘
         │                  │                 │                  │
         ▼                  │                 │                  ▼
 ┌───────────────────┐      │                 │        ┌─────────────────────────┐
-│   DATA LAYER      │      │                 │        │   LLM EXPLANATION LAYER  │
+│   DATA LAYER      │      │                 │        │   LLM LAYER              │
 │                   │      │                 │        │                         │
-│  yfinance_ingest  │      │                 │        │  explainer.py           │
-│  transforms.py    │      │                 │        │  claude_client.py       │
-│  models.py        │      │                 │        │  stub_client.py         │
-│                   │      │                 │        │  base.py (LLMClient ABC)│
+│  yfinance_ingest  │      │                 │        │  base.py (LLMClient ABC)│
+│  transforms.py    │      │                 │        │  factory.py             │
+│  models.py        │      │                 │        │  gemini_client.py◄dflt  │
+│                   │      │                 │        │  deepseek_client.py     │
+│                   │      │                 │        │  openai_client.py       │
+│                   │      │                 │        │  claude_client.py       │
+│                   │      │                 │        │  stub_client.py         │
+│                   │      │                 │        │  explainer.py           │
+│                   │      │                 │        │  decision.py            │
 │  data/raw/        │      │                 │        │                         │
 │  data/curated/    │      │                 │        │  data/signals/          │
 └───────┬───────────┘      │                 │        │  explanations/          │
@@ -830,7 +836,11 @@ instruments:
 | Research data | yfinance | Free, no auth, daily OHLCV. Phase 1 only. |
 | Live data | IG Streaming API | Lightstreamer-based. Phase 2+. Replaces yfinance for execution timing. |
 | Broker | IG REST API | Spreadbetting (UK). Supports long and short on all instruments. |
-| LLM | Anthropic Claude API | Model configured in `local.yaml`. Default: `claude-opus-4-6`. |
+| LLM (default) | Google Gemini API (`google-genai`) | Gemini 2.0 Flash. Free tier: ~1,500 req/day. Key: `GOOGLE_API_KEY`. |
+| LLM (option 2) | DeepSeek API (`openai` SDK, compat) | DeepSeek V3. Very low cost. Key: `DEEPSEEK_API_KEY`. |
+| LLM (option 3) | OpenAI API (`openai` SDK) | GPT-4o. Mid-tier cost. Key: `OPENAI_API_KEY`. |
+| LLM (option 4) | Anthropic Claude API (`anthropic`) | Claude Sonnet. Highest cost. Key: `ANTHROPIC_API_KEY`. |
+| LLM provider | Selected via `llm.provider` in `local.yaml` | `gemini` \| `deepseek` \| `openai` \| `claude` \| `stub` |
 | Dashboard | Streamlit | Multi-page app. Runs locally. Remote access via Tailscale. |
 | Charts | Plotly | Interactive zoom/pan in Streamlit. Static matplotlib charts are not used. |
 | Storage | Parquet / pyarrow | All persistent DataFrames. JSON for backtest summaries and LLM cache. |
@@ -1023,6 +1033,14 @@ Coverage is reported with `pytest-cov`. The target is 100% coverage of critical 
 
 **What gets built:** Pre-execution risk checks (daily loss limit, exposure cap, duplicate position guard, stop loss enforcement), kill switch (closes all positions within 60 seconds, sets `halted` flag), live credential switch documentation and checklist, forex instruments added, actual-vs-backtest performance comparison.
 
+---
+
+### Phase 4 — Automated Execution
+
+**What gets built:** `scripts/run_auto_trade.py` automated pipeline (ingest → signals → LLM decision → risk checks → position size → order submission), LLM gate (confidence threshold + GO recommendation required), `auto_trader.py` orchestrator, `risk_checks.py` pre-submission guard (kill switch, market hours, duplicate position, daily loss, max positions), `notifications.py` push alerts (ntfy.sh/Pushover) for every automated trade and suppression, 30-day demo validation gate before live auto-trading enabled.
+
+**Prerequisite:** Phase 3 complete, 30 days of stable paper trading validated, `docs/risk-review.md` signed off.
+
 **Exit criteria:** `docs/risk-review.md` completed and signed off. Kill switch exercised on demo. First live session: one instrument, minimum position size. Full watchlist expansion after two weeks of stable live operation.
 
 **Notes:** The transition from demo to live is a credential swap in `.env`. No code change is required.
@@ -1072,3 +1090,5 @@ A living register of known gaps and their resolution status. Update this section
 | GAP-009 | polars and scikit-learn in dependencies | Open | Remove from pyproject.toml |
 | GAP-010 | IG epic mapping missing from instruments.yaml | Phase 2 prereq | Add before Phase 2 begins |
 | GAP-011 | Signal persistence not implemented | Open | Implement data/signals/ write in Phase 1 |
+| GAP-012 | Multi-LLM provider support | Resolved (2026-04-26) | factory.py + gemini/deepseek/openai/claude clients; Gemini default |
+| GAP-013 | Automated execution pipeline | Phase 4 | scripts/run_auto_trade.py, auto_trader.py, risk_checks.py, notifications.py |

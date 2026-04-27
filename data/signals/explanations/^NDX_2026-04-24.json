@@ -1,0 +1,8 @@
+{
+  "symbol": "^NDX",
+  "signal_date": "2026-04-24",
+  "signal": 0,
+  "explanation": "This SHORT signal is predicated solely on extreme overbought conditions, with RSI at 74.8 and NDX 7.9% above its 20-SMA, implying a potential reversion. However, the conviction is non-existent, indicated by 0/100 confidence and zero strategies agreeing \u2013 that's a massive red flag.\n\nThe news on the signal date screams *bullish momentum*: NASDAQ 100 just hit record highs, propelled by strong tech earnings (Intel +23%) and AI optimism. While later news mentions U.S.-Iran deadlock weighing on Monday futures, this is marginal after such a parabolic run.\n\nThe news unequivocally *challenges* this weak technical signal. Betting short against fresh record highs and robust tech fundamentals, with zero conviction from your own system, is foolish. The momentum and fundamental strength far outweigh this speculative overbought indicator.",
+  "generated_at": "2026-04-27T09:27:20.730197+00:00",
+  "model": "gemini-2.5-flash"
+}

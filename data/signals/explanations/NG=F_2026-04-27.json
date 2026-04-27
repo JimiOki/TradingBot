@@ -1,0 +1,8 @@
+{
+  "symbol": "NG=F",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "explanation": "Alright, let's cut to the chase on NG=F.\n\nThe technicals are giving a weak SHORT signal. The EMA crossover is bearish, and the close is just below the fast SMA with the 20-day below the 50-day, indicating some downtrend momentum and an RSI below 50. However, the confidence is only 75/100, and critically, only 1 of 6 independent strategies agrees, which is a red flag for conviction.\n\nThe most market-moving news is Canada's approval of Enbridge's C$4 billion Westcoast natural gas pipeline expansion. This is a clear, long-term supply-side increase for Canadian natural gas, which will add transport capacity and, all else equal, exert downward pressure on prices.\n\nThis news *strongly reinforces* the technical SHORT signal. While the technical consensus is flimsy, the fundamental driver of increased natural gas supply capacity is a powerful bearish force that trumps the weak technical agreement here. I'd lean into the short with the understanding that the supply fundamentals are now aligned.",
+  "generated_at": "2026-04-27T09:25:40.562191+00:00",
+  "model": "gemini-2.5-flash"
+}

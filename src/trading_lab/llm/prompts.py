@@ -8,113 +8,164 @@ Both explanation prompts instruct the LLM to:
 """
 
 EXPLANATION_PROMPT_WITH_NEWS = """\
-You are a trading signal analyst. Write a 3-5 sentence explanation of the following \
-trading signal in plain English. Do not make price predictions or give investment advice. \
-Be directionally consistent with the signal direction stated below.
+You are a senior trader reviewing a signal for {instrument_name} ({symbol}). \
+Your job is to critically assess whether the technical signal is supported or undermined \
+by current market conditions and news. Be direct and opinionated — this is for a \
+professional trader who needs your honest view, not a disclaimer.
 
-## Signal Details
-- Instrument: {instrument_name} ({symbol})
+## Technical Signal
 - Signal Date: {signal_date}
-- Signal Direction: {signal_direction}
+- Direction: {signal_direction}
 - Close Price: {close:.4f}
 - Fast SMA ({fast_sma_period}): {fast_sma:.4f}
 - Slow SMA ({slow_sma_period}): {slow_sma:.4f}
 - RSI (14): {rsi:.1f}
 - Recent Trend: {recent_trend_summary}
-- Stop Loss: {stop_loss_level:.4f}
-- Take Profit: {take_profit_level:.4f}
-- Risk/Reward: {risk_reward_ratio:.1f}x
-- Confidence Score: {confidence_score}/100
-- Conflicting Indicators: {conflicting_indicators}
-- High Volatility: {high_volatility}
+- Stop Loss: {stop_loss_level:.4f} | Take Profit: {take_profit_level:.4f} | R/R: {risk_reward_ratio:.1f}x
+- Confidence: {confidence_score}/100 | Conflicting Indicators: {conflicting_indicators} | High Volatility: {high_volatility}
 
-## Recent News Headlines
+{strategy_signals_section}
+
+## News & Sentiment
 {news_section}
 
-## Instructions
-Part 1 — Technical basis: Explain in 2-3 sentences why this signal fired based on the \
-indicator readings above.
-Part 2 — News context: In 1-2 sentences, state whether the news headlines above support, \
-contradict, or are neutral relative to the {signal_direction} signal direction. If the news \
-contradicts the technical signal, you MUST explicitly flag this tension.
+## Your Analysis (3-5 sentences)
+1. What is the technical picture telling you — why is this signal {signal_direction} and how \
+   strong is the conviction given the strategy consensus?
+2. What specific market-moving information or risk factor does the news identify for \
+   {instrument_name}? Extract the key macro or fundamental driver, not just the headline.
+3. Does the news reinforce or challenge the technical signal? If they conflict, \
+   say so explicitly and explain which carries more weight right now and why.
 """
 
 EXPLANATION_PROMPT_NO_NEWS = """\
-You are a trading signal analyst. Write a 3-5 sentence explanation of the following \
-trading signal in plain English. Do not make price predictions or give investment advice. \
-Be directionally consistent with the signal direction stated below.
+You are a senior trader reviewing a signal for {instrument_name} ({symbol}). \
+Your job is to critically assess the technical signal and give an honest view \
+on its strength and reliability. Be direct — this is for a professional trader.
 
-## Signal Details
-- Instrument: {instrument_name} ({symbol})
+## Technical Signal
 - Signal Date: {signal_date}
-- Signal Direction: {signal_direction}
+- Direction: {signal_direction}
 - Close Price: {close:.4f}
 - Fast SMA ({fast_sma_period}): {fast_sma:.4f}
 - Slow SMA ({slow_sma_period}): {slow_sma:.4f}
 - RSI (14): {rsi:.1f}
 - Recent Trend: {recent_trend_summary}
-- Stop Loss: {stop_loss_level:.4f}
-- Take Profit: {take_profit_level:.4f}
-- Risk/Reward: {risk_reward_ratio:.1f}x
-- Confidence Score: {confidence_score}/100
-- Conflicting Indicators: {conflicting_indicators}
-- High Volatility: {high_volatility}
+- Stop Loss: {stop_loss_level:.4f} | Take Profit: {take_profit_level:.4f} | R/R: {risk_reward_ratio:.1f}x
+- Confidence: {confidence_score}/100 | Conflicting Indicators: {conflicting_indicators} | High Volatility: {high_volatility}
 
-Explain in 3-5 sentences why this signal fired based on the indicator readings above. \
-Focus on the technical drivers: SMA crossover, RSI position, and signal strength.
+{strategy_signals_section}
+
+## Your Analysis (3-4 sentences)
+Explain what the technical picture is saying, how strong the conviction is given \
+the strategy consensus, and what the main risk to this signal is.
 """
 
 DECISION_PROMPT = """\
-You are a trading signal review assistant. Evaluate the following trading signal and \
-return a structured JSON response. Do not give investment advice or make price predictions.
+You are a systematic trader with discretionary override capability. \
+You have been given technical signals and market news for {instrument_name} ({symbol}). \
+Make a clear trading decision: GO (act on the signal), NO_GO (stand aside), or \
+UNCERTAIN (insufficient conviction). Be decisive — UNCERTAIN should only be used \
+when evidence genuinely points in two directions equally.
 
-## Signal Details
-- Instrument: {instrument_name} ({symbol})
+## Technical Signal
 - Signal Date: {signal_date}
-- Signal Direction: {signal_direction}
-- Close Price: {close:.4f}
-- Fast SMA: {fast_sma:.4f}
-- Slow SMA: {slow_sma:.4f}
-- RSI (14): {rsi:.1f}
-- Recent Trend: {recent_trend_summary}
-- Stop Loss: {stop_loss_level:.4f}
-- Take Profit: {take_profit_level:.4f}
-- Risk/Reward: {risk_reward_ratio:.1f}x
-- Confidence Score: {confidence_score}/100
-- Conflicting Indicators: {conflicting_indicators}
-- High Volatility: {high_volatility}
+- Direction: {signal_direction}
+- Close: {close:.4f} | Fast SMA: {fast_sma:.4f} | Slow SMA: {slow_sma:.4f}
+- RSI (14): {rsi:.1f} | Trend: {recent_trend_summary}
+- Stop: {stop_loss_level:.4f} | Target: {take_profit_level:.4f} | R/R: {risk_reward_ratio:.1f}x
+- Confidence: {confidence_score}/100 | Conflicting: {conflicting_indicators} | Volatile: {high_volatility}
+
+{strategy_signals_section}
 {news_section}
 
-## Instructions
-Respond ONLY with a JSON object. No explanation outside the JSON.
-"NO_GO" and "UNCERTAIN" are first-class outcomes — prefer them over a forced "GO" when \
-evidence is mixed.
+## Decision Rules
+- 4-6 strategies agreeing → strong technical case, lean GO unless news is a clear headwind
+- 2-3 strategies agreeing → moderate case, news and sentiment become the deciding factor
+- 0-1 strategies agreeing → weak technical case, only GO if news provides a strong catalyst
+- If news identifies a specific macro risk (rate decision, geopolitical event, earnings) \
+  that directly affects this instrument, weight it heavily — it may override the technicals
+- If IG client sentiment strongly opposes the signal direction (>70% on opposite side), \
+  treat this as a contrarian flag worth noting
+
+Respond ONLY with a JSON object. No text outside the JSON.
 
 Required format:
 {{
   "recommendation": "GO" | "NO_GO" | "UNCERTAIN",
-  "rationale": "1-3 sentence rationale",
+  "rationale": "2-3 sentences: state the key technical driver, the most relevant news catalyst, and why you landed on this decision",
   "conflicts_with_technical": true | false
 }}
 """
 
 
 def _format_news_section(headlines: list[dict]) -> str:
-    """Format a list of news headline dicts into a readable string."""
+    """Format a list of news headline dicts into a readable string.
+
+    Includes article body text where available so the LLM can read beyond
+    the headline.
+    """
     if not headlines:
-        return "No recent news headlines available."
+        return "No recent news available."
     lines = []
     for h in headlines:
         ts = h.get("timestamp", "")
         title = h.get("title", "")
         source = h.get("source", "")
-        lines.append(f"- [{ts}] {title} ({source})")
+        body = h.get("body", "").strip()
+        line = f"- [{ts}] {title} ({source})"
+        if body:
+            line += f"\n  {body}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _format_strategy_signals(strategy_signals: dict) -> str:
+    """Format a strategy signals dict into a readable section string.
+
+    Args:
+        strategy_signals: Dict mapping strategy name to signal int (-1, 0, 1).
+                          Expected keys include: sma_cross, macd_cross, bollinger_breakout,
+                          bollinger_reversion, donchian, rsi_reversion.
+
+    Returns:
+        A formatted string ready to embed in a prompt, or empty string if no signals.
+    """
+    if not strategy_signals:
+        return ""
+
+    _SIGNAL_LABEL = {1: "LONG", -1: "SHORT", 0: "NEUTRAL"}
+    _KEY_TO_DISPLAY = {
+        "sma_cross": "EMA Crossover",
+        "macd_cross": "MACD Crossover",
+        "bollinger_breakout": "Bollinger Band Breakout",
+        "bollinger_reversion": "Bollinger Band Reversion",
+        "donchian": "Donchian Channel",
+        "rsi_reversion": "RSI Mean Reversion",
+    }
+
+    lines = ["## Strategy Signals (Independent Indicators)"]
+    for key, val in strategy_signals.items():
+        display_name = _KEY_TO_DISPLAY.get(key, key.replace("_", " ").title())
+        signal_label = _SIGNAL_LABEL.get(int(val) if val is not None else 0, "NEUTRAL")
+        lines.append(f"- {display_name}: {signal_label}")
+
+    # Compute consensus
+    non_neutral = [v for v in strategy_signals.values() if v is not None and int(v) != 0]
+    total = len(strategy_signals)
+    # Count signals that agree with majority direction
+    longs = sum(1 for v in strategy_signals.values() if v is not None and int(v) == 1)
+    shorts = sum(1 for v in strategy_signals.values() if v is not None and int(v) == -1)
+    agreeing = max(longs, shorts)
+    lines.append(f"Consensus: {agreeing} of {total} strategies agree on this direction")
+
     return "\n".join(lines)
 
 
 def build_explanation_prompt(context: "SignalContext", fast_sma_period: int = 20, slow_sma_period: int = 50) -> str:
     """Build the explanation prompt for a given SignalContext."""
     news_section = _format_news_section(context.news_headlines)
+    strategy_signals_section = _format_strategy_signals(context.strategy_signals)
     kwargs = dict(
         instrument_name=context.instrument_name,
         symbol=context.symbol,
@@ -134,6 +185,7 @@ def build_explanation_prompt(context: "SignalContext", fast_sma_period: int = 20
         conflicting_indicators=context.conflicting_indicators,
         high_volatility=context.high_volatility,
         news_section=news_section,
+        strategy_signals_section=strategy_signals_section,
     )
     if context.news_headlines:
         return EXPLANATION_PROMPT_WITH_NEWS.format(**kwargs)
@@ -146,6 +198,7 @@ def build_decision_prompt(context: "SignalContext") -> str:
         news_section = "\n## Recent News Headlines\n" + _format_news_section(context.news_headlines)
     else:
         news_section = ""
+    strategy_signals_section = _format_strategy_signals(context.strategy_signals)
     return DECISION_PROMPT.format(
         instrument_name=context.instrument_name,
         symbol=context.symbol,
@@ -163,4 +216,5 @@ def build_decision_prompt(context: "SignalContext") -> str:
         conflicting_indicators=context.conflicting_indicators,
         high_volatility=context.high_volatility,
         news_section=news_section,
+        strategy_signals_section=strategy_signals_section,
     )

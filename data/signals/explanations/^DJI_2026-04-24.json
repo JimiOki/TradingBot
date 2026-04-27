@@ -1,0 +1,8 @@
+{
+  "symbol": "^DJI",
+  "signal_date": "2026-04-24",
+  "signal": 0,
+  "explanation": "This SHORT signal is highly questionable. Technically, it's a contrarian call betting on a mean reversion from the price being extended 2.9% above its fast SMA and an elevated RSI, with the EMA Crossover as the sole supporting strategy. However, the conviction is severely undermined by the *abysmal* consensus, with only 1 out of 6 independent strategies agreeing on this direction.\n\nThe news identifies major market-moving catalysts for the week immediately following the signal: a massive slate of mega-cap tech earnings (which will dictate broad market sentiment) and an upcoming Federal Reserve meeting, alongside persistent geopolitical risk from Iran driving oil prices. These are binary events that will either extend the rally or trigger a significant correction.\n\nThe news therefore *challenges* this weak technical SHORT signal. Taking a contrarian SHORT based on such a low-conviction technical setup, right before a week of crucial, market-defining events, is reckless and lacks the robust confirmation needed to justify the risk.",
+  "generated_at": "2026-04-27T09:29:07.859098+00:00",
+  "model": "gemini-2.5-flash"
+}

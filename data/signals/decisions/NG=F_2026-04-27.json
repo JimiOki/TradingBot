@@ -1,0 +1,10 @@
+{
+  "symbol": "NG=F",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "llm_recommendation": "NO_GO",
+  "rationale": "The technical signal indicates a SHORT direction with 75/100 confidence and a favorable R/R, however, only one out of six independent strategies agrees, pointing to a very weak technical consensus. Recent news explicitly mentions that 'reducing global oil and natural gas supply has increased their prices' due to geopolitical conflict, suggesting a bullish catalyst for natural gas prices that directly conflicts with the short signal. Given the weak technical support and conflicting market sentiment from the news, standing aside is the prudent decision.",
+  "conflicts_with_technical": true,
+  "generated_at": "2026-04-27T09:25:51.888003+00:00",
+  "model": "gemini-2.5-flash"
+}

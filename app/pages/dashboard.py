@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from trading_lab.paths import CURATED_DATA_DIR, EXPLANATIONS_DIR, SIGNALS_DATA_DIR
+from trading_lab.paths import CURATED_DATA_DIR, EXPLANATIONS_DIR, SIGNAL_NEWS_DIR, SIGNALS_DATA_DIR
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -68,7 +68,12 @@ def get_signal_age_days(timestamp) -> int | None:
 
 
 def is_data_stale(timestamp, threshold_hours: int = STALE_DATA_HOURS) -> bool:
-    """True if timestamp is older than threshold_hours from now, or if None."""
+    """True if timestamp is more than 2 business days old, or if None.
+
+    Uses business-day counting so weekend gaps (e.g. Friday → Monday) don't
+    trigger a false staleness warning. threshold_hours is kept as a parameter
+    for backwards compatibility but is no longer the primary check.
+    """
     if timestamp is None or (isinstance(timestamp, float) and pd.isna(timestamp)):
         return True
     try:
@@ -77,8 +82,11 @@ def is_data_stale(timestamp, threshold_hours: int = STALE_DATA_HOURS) -> bool:
             ts = ts.tz_localize("UTC")
         else:
             ts = ts.tz_convert("UTC")
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=threshold_hours)
-        return ts < cutoff
+        today = pd.Timestamp(datetime.now(timezone.utc).date())
+        bar_date = pd.Timestamp(ts.date())
+        # Count how many business days (Mon–Fri) have elapsed since the bar date.
+        bdays = len(pd.bdate_range(bar_date, today)) - 1  # -1: range is inclusive
+        return bdays > 2
     except Exception:
         return True
 
@@ -120,6 +128,17 @@ def load_explanation(symbol: str, date_str: str) -> str:
 # --- Correlation warning threshold (REQ-RISK-003) ---
 CORRELATION_WARNING_THRESHOLD = 0.7
 CORRELATION_LOOKBACK_BARS = 60
+
+
+def load_news(symbol: str, date_str: str) -> list[dict]:
+    """Read persisted news headlines for a symbol+date. Returns [] if absent."""
+    path = SIGNAL_NEWS_DIR / f"{symbol}_{date_str}.json"
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
 
 
 def load_decision(symbol: str, date_str: str) -> dict | None:
@@ -403,23 +422,83 @@ def _render_signal_table(df: pd.DataFrame) -> None:
                 + (" ⚠️ data over 24 h old" if stale_data else "")
             )
 
-            # LLM explanation (REQ-LLM-007)
-            explanation = load_explanation(symbol, today_str)
-            if explanation == EXPLANATION_UNAVAILABLE:
-                st.caption("_Explanation unavailable._")
-            else:
-                with st.expander("Signal explanation"):
-                    st.text(explanation)  # plain text — no markdown rendering of LLM output
+            # LLM Analysis panel (REQ-LLM-007, REQ-LLMDEC-001)
+            # Use signal_date (last bar date) not today — cache is keyed on bar date
+            ts_for_cache = row.get("timestamp_of_last_bar")
+            signal_date_str = (
+                str(pd.Timestamp(ts_for_cache).date())
+                if ts_for_cache is not None
+                else today_str
+            )
+            explanation = load_explanation(symbol, signal_date_str)
+            decision = load_decision(symbol, signal_date_str)
+            news_items = load_news(symbol, signal_date_str)
 
-            # LLM decision (REQ-LLMDEC-001)
-            decision = load_decision(symbol, today_str)
-            if decision:
-                rec = decision.get("llm_recommendation", "UNCERTAIN")
-                rationale = decision.get("rationale", "")
-                rec_colour = {"GO": "green", "NO_GO": "red", "UNCERTAIN": "orange"}.get(rec, "grey")
-                st.markdown(f"**LLM Decision:** :{rec_colour}[{rec}]")
-                if rationale:
-                    st.caption(rationale)
+            # --- IG Client Sentiment bar (shown outside LLM expander, always visible) ---
+            ig_sentiment_item = next((h for h in news_items if h.get("source") == "IG Client Sentiment"), None)
+            if ig_sentiment_item:
+                long_pct = float(ig_sentiment_item.get("long_pct", 0))
+                short_pct = float(ig_sentiment_item.get("short_pct", 0))
+                bias = "LONG-biased" if long_pct > short_pct else "SHORT-biased"
+                bias_colour = "green" if long_pct > short_pct else "red"
+                scol1, scol2, scol3 = st.columns([2, 2, 1])
+                scol1.metric("IG Clients Long", f"{long_pct:.0f}%")
+                scol2.metric("IG Clients Short", f"{short_pct:.0f}%")
+                scol3.markdown(f":{bias_colour}[**{bias}**]")
+                st.progress(long_pct / 100)
+
+            with st.expander("LLM Analysis", expanded=True):
+                is_flat = (row.get("signal") == 0 or row.get("signal") is None)
+
+                # --- News ---
+                st.markdown("##### News")
+                yf_news = [h for h in news_items if h.get("source") != "IG Client Sentiment"]
+                if yf_news:
+                    for h in yf_news:
+                        url = h.get("url", "")
+                        title = h.get("title", "")
+                        source = h.get("source", "")
+                        ts = h.get("timestamp", "")
+                        label = f"{title} — *{source}*" if source else title
+                        prefix = f"`{ts}` " if ts else ""
+                        if url:
+                            st.markdown(f"{prefix}[{label}]({url})")
+                        else:
+                            st.caption(f"{prefix}{label}")
+                else:
+                    st.caption("_No news available._")
+
+                st.divider()
+
+                # --- Signal Explanation ---
+                st.markdown("##### Signal Explanation")
+                if explanation != EXPLANATION_UNAVAILABLE:
+                    st.markdown(explanation)
+                elif is_flat:
+                    st.caption("_No directional signal — strategies are split or neutral._")
+                else:
+                    st.caption("_Explanation unavailable._")
+
+                st.divider()
+
+                # --- Decision ---
+                st.markdown("##### Decision")
+                if decision:
+                    rec = decision.get("llm_recommendation", "UNCERTAIN")
+                    rationale = decision.get("rationale", "")
+                    rec_colour = {"GO": "green", "NO_GO": "red", "UNCERTAIN": "orange"}.get(rec, "grey")
+                    conflicts = decision.get("conflicts_with_technical", False)
+                    dcol1, dcol2 = st.columns([1, 3])
+                    dcol1.markdown(f"### :{rec_colour}[{rec}]")
+                    with dcol2:
+                        if rationale:
+                            st.markdown(rationale)
+                        if conflicts:
+                            st.warning("LLM view conflicts with the technical signal.")
+                elif is_flat:
+                    st.caption("_No directional signal — LLM analysis only runs for Buy/Sell signals._")
+                else:
+                    st.caption("_LLM decision unavailable._")
 
             # Position sizing (REQ-RISK-004) — only for directional signals
             if label in ("Buy", "Sell"):
@@ -439,6 +518,8 @@ def _render_signal_table(df: pd.DataFrame) -> None:
                         )
                 else:
                     st.caption("📐 Position size: N/A — stop distance unavailable")
+
+
 
 
 # ---------------------------------------------------------------------------

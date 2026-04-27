@@ -15,18 +15,30 @@ import yaml
 
 from trading_lab.exceptions import ConfigValidationError
 from trading_lab.strategies.base import Strategy
+from trading_lab.strategies.bollinger import BollingerStrategy
+from trading_lab.strategies.donchian import DonchianStrategy
+from trading_lab.strategies.macd_cross import MacdCrossStrategy
+from trading_lab.strategies.rsi_reversion import RsiReversionStrategy
 from trading_lab.strategies.sma_cross import SmaCrossStrategy
 
 # Registry maps strategy name → class.
 # Add new strategy classes here when they are implemented.
 _STRATEGY_REGISTRY: dict[str, type[Strategy]] = {
     "sma_cross": SmaCrossStrategy,
+    "macd_cross": MacdCrossStrategy,
+    "donchian": DonchianStrategy,
+    "bollinger": BollingerStrategy,
+    "rsi_reversion": RsiReversionStrategy,
 }
 
 # Minimum required params for each strategy.
 # A missing required param raises ConfigValidationError at load time.
 _REQUIRED_PARAMS: dict[str, set[str]] = {
     "sma_cross": {"fast_window", "slow_window"},
+    "macd_cross": {"fast_window", "slow_window", "signal_window"},
+    "donchian": {"channel_window"},
+    "bollinger": {"bb_window", "mode"},
+    "rsi_reversion": {"rsi_oversold", "rsi_overbought"},
 }
 
 

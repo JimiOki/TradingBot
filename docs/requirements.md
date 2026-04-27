@@ -39,11 +39,16 @@
    - 5.4 [Forex Expansion](#54-forex-expansion)
    - 5.5 [Streamlit Dashboard — Phase 3 Additions](#55-streamlit-dashboard--phase-3-additions)
    - 5.6 [Non-Functional Requirements — Phase 3](#56-non-functional-requirements--phase-3)
-6. [Discretionary Workflow — End to End](#6-discretionary-workflow--end-to-end)
-7. [Gaps and Contradictions](#7-gaps-and-contradictions)
-8. [Assumptions Register](#8-assumptions-register)
-9. [Open Questions](#9-open-questions)
-10. [Dependency Map](#10-dependency-map)
+6. [Phase 4 — Automated Execution (stub)](#6-phase-4--automated-execution-stub)
+   - 6.1 [Automated Pipeline](#61-automated-pipeline)
+   - 6.2 [Guardrails](#62-guardrails)
+   - 6.3 [Notifications and Audit Trail](#63-notifications-and-audit-trail)
+   - 6.4 [Demo Validation Gate](#64-demo-validation-gate)
+7. [Discretionary Workflow — End to End](#7-discretionary-workflow--end-to-end)
+8. [Gaps and Contradictions](#8-gaps-and-contradictions)
+9. [Assumptions Register](#9-assumptions-register)
+10. [Open Questions](#10-open-questions)
+11. [Dependency Map](#11-dependency-map)
 
 ---
 
@@ -103,7 +108,7 @@ In scope:
 
 Out of scope:
 - New asset classes beyond forex
-- Fully automated execution without user approval (may be considered as a future phase)
+- Fully automated execution without user approval — deferred to Phase 4
 
 ---
 
@@ -127,6 +132,7 @@ The following decisions are fixed constraints for all phases. Requirements must 
 | Application type | Streamlit dashboard, Python, browser-based, runs locally. |
 | Storage | Parquet files on local disk. |
 | Short selling | IG spreadbetting supports shorts. The backtest engine must support short-side simulation from Phase 1 even though the Phase 1 engine starts long/flat. Short execution requires Phase 3. |
+| LLM provider | Configurable. Default: Gemini 2.0 Flash (free tier via Google AI Studio, ~1,500 req/day). Supported values for `llm.provider` in `config/environments/local.yaml`: `gemini`, `deepseek`, `openai`, `claude`. Single provider selected per run; no runtime fallback chain between providers. |
 
 ---
 
@@ -868,7 +874,49 @@ After each trading signal is generated, call an LLM API to produce a plain Engli
 - The post-generation validation step (from REQ-LLM-003) applies equally to news-informed explanations; the explanation must still be 3–5 sentences, non-empty, and within the character limit.
 - A manual review of at least three generated explanations (with and without news context) is performed before this requirement is considered complete, to confirm the model is following the two-part structure instruction.
 
-**Assumption:** The two-part structure instruction increases prompt complexity. If the Claude API model used cannot reliably follow the two-part instruction, the prompt template must be revised. This does not change the requirement itself.
+**Assumption:** The two-part structure instruction increases prompt complexity. If the configured LLM provider cannot reliably follow the two-part instruction, the prompt template must be revised. This does not change the requirement itself.
+
+---
+
+#### REQ-LLM-010 — Multi-provider support
+
+**Requirement:** The LLM layer must support four providers — Gemini, DeepSeek, OpenAI, and Claude — selectable via a factory function. All four must implement the same `LLMClient` abstract base class.
+
+**Acceptance criteria:**
+- An `LLMClient` ABC declares a single abstract method `complete(prompt: str) -> str` with no provider-specific logic.
+- A factory function `create_llm_client(config) -> LLMClient` reads `llm.provider` from config and returns the appropriate concrete implementation.
+- The factory raises a `ConfigurationError` for any `llm.provider` value not in `{"gemini", "deepseek", "openai", "claude"}`.
+- Swapping the active provider requires only changing `llm.provider` in `config/environments/local.yaml`; no source-code change is required.
+- A `StubLLMClient` exists in the test suite and returns a fixed string without making network calls; all unit tests that exercise LLM-adjacent code use this stub.
+- If the LLM call fails for any reason, the system falls back to `StubLLMClient` behaviour (returns `"Explanation unavailable."`) and does not attempt another provider. The failure is logged at `WARNING` level.
+
+---
+
+#### REQ-LLM-011 — Default provider
+
+**Requirement:** The default LLM provider is Gemini 2.0 Flash, accessed via the Google AI Studio free tier. If `GOOGLE_API_KEY` is absent and `llm.provider` is `gemini`, the system must degrade gracefully rather than raising an unhandled error.
+
+**Acceptance criteria:**
+- `llm.provider` defaults to `gemini` when not specified in `config/environments/local.yaml`.
+- If `GOOGLE_API_KEY` is absent or empty and `llm.provider` is `gemini`, the system logs a `WARNING` at startup identifying the missing variable by name and substitutes `StubLLMClient` for all LLM calls in that run.
+- The `WARNING` message includes the text `"GOOGLE_API_KEY not set"` and states that LLM explanations will be unavailable for that run.
+- A unit test verifies that with `GOOGLE_API_KEY` unset and `llm.provider=gemini`, the factory returns a `StubLLMClient` and does not raise an exception.
+
+---
+
+#### REQ-LLM-012 — Provider API key environment variables
+
+**Requirement:** Each supported LLM provider reads its API key from a dedicated environment variable. A missing key for the configured provider is a startup error, except for `gemini` which degrades to a stub (REQ-LLM-011).
+
+**Acceptance criteria:**
+- Provider-to-env-var mapping is fixed and documented:
+  - `gemini` → `GOOGLE_API_KEY`
+  - `deepseek` → `DEEPSEEK_API_KEY`
+  - `openai` → `OPENAI_API_KEY`
+  - `claude` → `ANTHROPIC_API_KEY`
+- If the env var for the configured provider is absent or empty and the provider is not `gemini`, the factory raises a `ConfigurationError` identifying the missing variable by name.
+- No provider implementation reads another provider's env var. A unit test for each provider asserts that only the correct env var is consulted.
+- All four env var names are covered by the REQ-NFR-003 pre-commit hook as forbidden patterns in staged files.
 
 ---
 
@@ -1646,11 +1694,110 @@ Before `IG_ENVIRONMENT=live` is used for the first time, the following must be r
 
 ---
 
-## 6. Discretionary Workflow — End to End
+## 6. Phase 4 — Automated Execution (stub)
+
+Phase 4 removes the human approval step. The system generates signals, obtains an LLM go/no-go decision, and submits orders automatically without requiring user input. Phase 4 has not been designed in detail; this section is a stub that captures the known scope and prerequisites so future design work begins from a documented baseline.
+
+**Prerequisites before Phase 4 begins:**
+- Phase 3 complete and stable on the IG live account.
+- At least 30 days of stable Phase 2 paper trading completed with no critical defects recorded.
+- Kill switch (REQ-LRISK-001) tested and verified on the IG demo account.
+- Automated pipeline validated on the IG demo account for 30 days before live auto-trading is enabled (REQ-AUTO-006).
+
+**Out of scope for Phase 4:**
+- ML-based signal generation.
+- Portfolio optimisation or mean-variance allocation.
+
+---
+
+### 6.1 Automated Pipeline
+
+#### REQ-AUTO-001 — Automated pipeline
+
+**Requirement:** A scheduled script must run the full pipeline — ingest, signal generation, LLM decision, position sizing, and order submission — without human intervention.
+
+**Acceptance criteria:**
+- The script is schedulable via cron or Windows Task Scheduler and requires no interactive input to run.
+- The complete sequence is: data ingest → signal generation → LLM go/no-go decision → guardrail checks → position sizing → order submission (if all gates pass).
+- Each pipeline stage logs its outcome at `INFO` level before proceeding to the next stage.
+- A dry-run mode (`--dry-run` flag) executes all stages up to but not including order submission and logs what would have been submitted.
+
+---
+
+### 6.2 Guardrails
+
+#### REQ-AUTO-002 — LLM gate
+
+**Requirement:** An automated order fires only when `confidence_score >= configurable_threshold` AND `llm_recommendation == "GO"`. Any other LLM output suppresses the order.
+
+**Acceptance criteria:**
+- The confidence threshold is configurable in `config/environments/local.yaml` under `automation.confidence_threshold` and defaults to `70`.
+- An automated order is submitted only when both conditions are true simultaneously: `confidence_score >= automation.confidence_threshold` AND `llm_recommendation == "GO"`.
+- An LLM output of `"UNCERTAIN"` or `"NO_GO"` suppresses the order regardless of confidence score. The suppression is logged at `INFO` level with instrument, recommendation, and confidence score.
+- The threshold value is validated at startup: must be an integer in `[0, 100]`. A value outside this range raises a `ConfigValidationError`.
+
+---
+
+#### REQ-AUTO-003 — Guardrails
+
+**Requirement:** Five guardrail checks must all pass before any automated order is submitted. A single failing check blocks the order.
+
+**Acceptance criteria — all five checks are evaluated in this order:**
+1. **Kill switch check:** if the system is in `halted` state (REQ-LRISK-001), no order is submitted.
+2. **Market hours check:** the instrument's primary market must be open (using session hours from `instruments.yaml`). Orders are not submitted outside market hours.
+3. **Daily loss limit:** today's realised losses must not equal or exceed `risk.daily_loss_limit_pct` of account balance.
+4. **Max open positions:** the number of currently open positions must be below `risk.max_open_positions`.
+5. **Duplicate position guard:** if a position in the same instrument and direction already exists, the order is suppressed.
+- Each blocked order logs the reason at `WARNING` level with instrument name, the failing guardrail name, and the current values that triggered the block.
+- All guardrail thresholds are read from `config/environments/local.yaml`; none are hardcoded.
+
+---
+
+### 6.3 Notifications and Audit Trail
+
+#### REQ-AUTO-004 — Notification on automated order placement
+
+**Requirement:** Every automated order placement must trigger a push notification. Notification failure must not block or roll back the order.
+
+**Acceptance criteria:**
+- A notification is sent via ntfy.sh (or equivalent configurable endpoint) on every automated order submitted to the broker.
+- The notification payload contains at minimum: instrument name, direction (BUY/SELL), position size, and entry price.
+- If the notification call fails for any reason, the failure is logged at `WARNING` level and order processing continues. The order is not cancelled due to a notification failure.
+- The notification endpoint is configurable via `PUSH_NOTIFICATION_URL` in `.env`. When this variable is absent, notifications are disabled and no outbound call is made.
+
+---
+
+#### REQ-AUTO-005 — Audit trail for automated decisions
+
+**Requirement:** Every automated decision — whether an order was placed, suppressed, or blocked — must be written to `logs/audit.log` with full context.
+
+**Acceptance criteria:**
+- Every automated pipeline run writes an audit entry for each instrument processed, regardless of outcome.
+- Each entry contains at minimum: `timestamp` (ISO 8601 UTC), `instrument`, `pipeline_run_id`, `signal_direction`, `confidence_score`, `llm_recommendation`, `guardrails_passed` (list of passed checks), `guardrails_failed` (list of failed checks, empty if none), `action` (one of: `order_submitted`, `order_suppressed_llm`, `order_blocked_guardrail`), and `deal_id` (non-null only when `action="order_submitted"`).
+- Audit entries are appended to `logs/audit.log` in JSON-lines format. The file is never truncated by application code.
+- A unit test verifies that a suppressed order (LLM returned `"UNCERTAIN"`) produces an audit entry with `action="order_suppressed_llm"` and a non-null `llm_recommendation` field.
+
+---
+
+### 6.4 Demo Validation Gate
+
+#### REQ-AUTO-006 — Demo account validation before live auto-trading
+
+**Requirement:** Automated trading must run for a minimum of 30 days on the IG demo account before live auto-trading is enabled.
+
+**Acceptance criteria:**
+- A config flag `automation.live_auto_trading_enabled` in `config/environments/local.yaml` defaults to `false`. Automated order submission against the live account is blocked unless this flag is explicitly set to `true`.
+- Before setting `live_auto_trading_enabled: true`, the operator must record a sign-off entry in `docs/risk-review.md` confirming: 30 days of demo auto-trading completed, audit log reviewed, kill switch tested on demo account, and no critical defects observed.
+- The automated pipeline checks this flag at startup. If `IG_ENVIRONMENT=live` and `live_auto_trading_enabled=false`, the pipeline logs a prominent `WARNING` and exits without processing any instruments.
+- A unit test verifies that with `IG_ENVIRONMENT=live` and `live_auto_trading_enabled=false`, the pipeline exits before any signal generation or order submission occurs.
+
+---
+
+## 7. Discretionary Workflow — End to End
 
 This section describes the complete operational workflow in Phase 1 (research only) and Phase 2 (signal approval and paper execution). It is the reference for UI designers and engineers implementing the dashboard interaction model.
 
-### 6.1 Daily Research Workflow (Phase 1)
+### 7.1 Daily Research Workflow (Phase 1)
 
 ```
 1. SCHEDULE: User opens Streamlit dashboard (or runs refresh manually each morning).
@@ -1683,7 +1830,7 @@ This section describes the complete operational workflow in Phase 1 (research on
    - Dashboard may be left open; stale data warning appears if data is more than 2 days old.
 ```
 
-### 6.2 Signal Approval and Paper Trade Workflow (Phase 2)
+### 7.2 Signal Approval and Paper Trade Workflow (Phase 2)
 
 ```
 1. DATA REFRESH (same as Phase 1, Step 1-2).
@@ -1734,7 +1881,7 @@ This section describes the complete operational workflow in Phase 1 (research on
    - The system records exits by polling IG open positions and detecting closed deals.
 ```
 
-### 6.3 Key Decision Points and Human Judgment Boundaries
+### 7.3 Key Decision Points and Human Judgment Boundaries
 
 | Step | System action | Human decision required |
 |---|---|---|
@@ -1749,7 +1896,7 @@ This section describes the complete operational workflow in Phase 1 (research on
 
 ---
 
-## 7. Gaps and Contradictions
+## 8. Gaps and Contradictions
 
 ### GAP-001 — BacktestConfig is missing required fields
 
@@ -1797,7 +1944,7 @@ yfinance uses continuous futures symbols (e.g. `GC=F` for Gold). IG spreadbettin
 
 ---
 
-## 8. Assumptions Register
+## 9. Assumptions Register
 
 | ID | Assumption | Phase | Impact if wrong |
 |---|---|---|---|
@@ -1816,7 +1963,7 @@ yfinance uses continuous futures symbols (e.g. `GC=F` for Gold). IG spreadbettin
 
 ---
 
-## 9. Open Questions
+## 10. Open Questions
 
 These questions must be answered before the indicated requirement can be finalised. Each question is an explicit blocker or a risk to correctness.
 
@@ -1837,7 +1984,7 @@ These questions must be answered before the indicated requirement can be finalis
 
 ---
 
-## 10. Dependency Map
+## 11. Dependency Map
 
 ```
 Phase 1 dependencies
@@ -2276,7 +2423,7 @@ Constrain the Market Context Engine and all supporting data integrations to free
 
 ---
 
-*End of Trading Lab Requirements — v2.0*
+*End of Trading Lab Requirements — v2.1*
 *Supersedes: `docs/requirements-phase1.md`*
 
 

@@ -1,0 +1,8 @@
+{
+  "symbol": "^N225",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "explanation": "The technical signal for a SHORT is based on an overbought RSI (67.0) and the price being significantly extended (6.8% above fast SMA), suggesting a mean reversion. However, the conviction is weak at 75/100, and a paltry 2 out of 6 independent strategies agree, with others signaling LONG. Crucially, the provided Stop Loss and Take Profit levels are inverted for a SHORT, making this signal internally contradictory and fundamentally flawed.\n\nNews highlights overwhelming bullish momentum: Nikkei closing above 60,000 for the first time ever, driven by robust earnings from electronics leaders (Fanuc, Keyence jumping 16%), and broad global market strength. A multi-year bull market narrative further underpins the positive sentiment, with oil price concerns on the periphery for now.\n\nThe news absolutely annihilates this technical SHORT signal. The current market conditions of record highs and strong fundamental drivers massively outweigh a weak, internally inconsistent technical call based solely on \"overbought\" conditions. **This signal is garbage; do not take this SHORT. The market has clear upward momentum.**",
+  "generated_at": "2026-04-27T09:28:33.584271+00:00",
+  "model": "gemini-2.5-flash"
+}
