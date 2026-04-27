@@ -485,16 +485,27 @@ def _render_signal_table(df: pd.DataFrame) -> None:
                 st.markdown("##### Decision")
                 if decision:
                     rec = decision.get("llm_recommendation", "UNCERTAIN")
+                    llm_direction = decision.get("direction")  # "LONG", "SHORT", or None
                     rationale = decision.get("rationale", "")
                     rec_colour = {"GO": "green", "NO_GO": "red", "UNCERTAIN": "orange"}.get(rec, "grey")
                     conflicts = decision.get("conflicts_with_technical", False)
+                    # Build the badge label: "GO LONG" / "GO SHORT" for GO, else just rec
+                    if rec == "GO" and llm_direction:
+                        dir_colour = "green" if llm_direction == "LONG" else "red"
+                        badge_md = f"### :{rec_colour}[GO] :{dir_colour}[{llm_direction}]"
+                    else:
+                        badge_md = f"### :{rec_colour}[{rec}]"
                     dcol1, dcol2 = st.columns([1, 3])
-                    dcol1.markdown(f"### :{rec_colour}[{rec}]")
+                    dcol1.markdown(badge_md)
                     with dcol2:
+                        # Show technical consensus as context
+                        tech_label = get_signal_label(row.get("signal"))
+                        if tech_label not in ("Data Missing", "Neutral"):
+                            st.caption(f"Technical consensus: **{tech_label.upper()}**")
                         if rationale:
                             st.markdown(rationale)
                         if conflicts:
-                            st.warning("LLM view conflicts with the technical signal.")
+                            st.warning("LLM direction conflicts with the technical consensus.")
                 elif is_flat:
                     st.caption("_No directional signal — LLM analysis only runs for Buy/Sell signals._")
                 else:

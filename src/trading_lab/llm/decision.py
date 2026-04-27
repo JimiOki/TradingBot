@@ -32,6 +32,7 @@ class LLMDecision:
     signal_date: date
     signal: int
     llm_recommendation: str      # "GO", "NO_GO", or "UNCERTAIN"
+    direction: str | None        # "LONG", "SHORT", or None
     rationale: str               # 1-3 sentences
     conflicts_with_technical: bool
     generated_at: datetime
@@ -64,6 +65,7 @@ class DecisionService:
                     signal_date=date.fromisoformat(data["signal_date"]),
                     signal=data["signal"],
                     llm_recommendation=data["llm_recommendation"],
+                    direction=data.get("direction"),
                     rationale=data["rationale"],
                     conflicts_with_technical=data["conflicts_with_technical"],
                     generated_at=datetime.fromisoformat(data["generated_at"]),
@@ -90,6 +92,7 @@ class DecisionService:
                 signal_date=context.signal_date,
                 signal=context.signal,
                 llm_recommendation="UNCERTAIN",
+                direction=None,
                 rationale=DECISION_UNAVAILABLE,
                 conflicts_with_technical=False,
                 generated_at=datetime.now(timezone.utc),
@@ -103,6 +106,7 @@ class DecisionService:
             signal_date=context.signal_date,
             signal=context.signal,
             llm_recommendation=decision["recommendation"],
+            direction=decision.get("direction"),
             rationale=decision["rationale"],
             conflicts_with_technical=bool(decision.get("conflicts_with_technical", False)),
             generated_at=generated_at,
@@ -118,6 +122,7 @@ class DecisionService:
                 "signal_date": str(result.signal_date),
                 "signal": result.signal,
                 "llm_recommendation": result.llm_recommendation,
+                "direction": result.direction,
                 "rationale": result.rationale,
                 "conflicts_with_technical": result.conflicts_with_technical,
                 "generated_at": result.generated_at.isoformat(),
@@ -155,8 +160,18 @@ class DecisionService:
         if recommendation not in _VALID_RECOMMENDATIONS:
             raise ValueError(f"Unrecognised recommendation '{recommendation}'")
 
+        raw_direction = data.get("direction")
+        if raw_direction is not None:
+            raw_direction = str(raw_direction).upper()
+            if raw_direction not in {"LONG", "SHORT"}:
+                raw_direction = None
+        # Enforce: direction must be null when recommendation is not GO
+        if recommendation != "GO":
+            raw_direction = None
+
         return {
             "recommendation": recommendation,
+            "direction": raw_direction,
             "rationale": str(data.get("rationale", DECISION_UNAVAILABLE)),
             "conflicts_with_technical": bool(data.get("conflicts_with_technical", False)),
         }
