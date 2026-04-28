@@ -131,6 +131,22 @@ def _build_epic_map(instruments: list[dict]) -> dict[str, str]:
     }
 
 
+def _build_price_factor_map(instruments: list[dict]) -> dict[str, float]:
+    """Return {symbol: ig_price_factor} — multiplier from Yahoo price scale to IG points."""
+    return {
+        inst["symbol"]: float(inst.get("ig_price_factor", 1))
+        for inst in instruments
+    }
+
+
+def _build_min_size_map(instruments: list[dict]) -> dict[str, float]:
+    """Return {symbol: ig_min_size} — per-instrument minimum deal size from IG."""
+    return {
+        inst["symbol"]: float(inst.get("ig_min_size", _MIN_SIZE))
+        for inst in instruments
+    }
+
+
 def _load_decision(symbol: str, signal_date: date) -> dict | None:
     """Load the LLM decision JSON for symbol+date, or None if not found."""
     filename = f"{symbol}_{signal_date}.json"
@@ -152,6 +168,43 @@ def _calculate_size(capital: float, stop_distance: float, risk_pct: float = 1.0)
         return _MIN_SIZE
     raw = gbp_risk / stop_distance
     return max(_MIN_SIZE, min(_MAX_SIZE, round(raw, 1)))
+
+
+def _llm_direction_to_ig(direction: str) -> str:
+    """Map LLM direction (LONG/SHORT) to IG direction (BUY/SELL)."""
+    return "BUY" if direction == "LONG" else "SELL"
+
+
+def _ig_direction_to_llm(direction: str) -> str:
+    """Map IG direction (BUY/SELL) to LLM direction (LONG/SHORT)."""
+    return "LONG" if direction == "BUY" else "SHORT"
+
+
+def _fetch_open_positions_map(
+    broker: IgBrokerAdapter | None,
+    epic_map: dict[str, str],
+) -> dict[str, dict]:
+    """Fetch open positions and return a lookup from epic → position dict.
+
+    For dry runs where the broker might not be connected, returns an empty dict.
+    """
+    if broker is None:
+        return {}
+
+    try:
+        positions = broker.fetch_positions()
+    except Exception as exc:
+        logger.warning("Could not fetch open positions: %s — defaulting to empty.", exc)
+        return {}
+
+    pos_map: dict[str, dict] = {}
+    for pos in positions:
+        epic = pos.get("epic", "")
+        if epic:
+            pos_map[epic] = pos
+
+    logger.info("Fetched %d open position(s).", len(pos_map))
+    return pos_map
 
 
 def _signal_date_for_row(row: pd.Series) -> date | None:
@@ -178,6 +231,9 @@ def process_instrument(
     dry_run: bool,
     broker: IgBrokerAdapter | None,
     capital: float,
+    open_positions: dict[str, dict] | None = None,
+    price_factor_map: dict[str, float] | None = None,
+    min_size_map: dict[str, float] | None = None,
 ) -> dict:
     """Evaluate one snapshot row and optionally place an order.
 
@@ -214,8 +270,21 @@ def process_instrument(
         logger.info("  SKIPPED %s — %s", symbol, result["note"])
         return result
 
+    # --- Position lookup ---
+    if open_positions is None:
+        open_positions = {}
+    epic = epic_map.get(symbol, "")
+    existing_pos = open_positions.get(epic) if epic else None
+
     decision = _load_decision(symbol, signal_date)
     if decision is None:
+        if existing_pos:
+            # No decision file — leave existing position open (don't close on missing data)
+            result["note"] = f"no decision file for {symbol}_{signal_date} — leaving existing position open"
+            result["decision"] = "NO FILE"
+            result["action"] = "HELD"
+            logger.info("  HELD %s — %s", symbol, result["note"])
+            return result
         result["note"] = f"no decision file for {symbol}_{signal_date}"
         result["decision"] = "NO FILE"
         logger.info("  SKIPPED %s — %s", symbol, result["note"])
@@ -225,6 +294,34 @@ def process_instrument(
     result["decision"] = llm_rec
 
     if llm_rec != "GO":
+        # LLM says NO_GO or UNCERTAIN — if there's an open position, close it
+        if existing_pos:
+            pos_deal_id = existing_pos.get("deal_id", "")
+            pos_direction = existing_pos.get("direction", "")
+            pos_size = existing_pos.get("size", 0)
+            if dry_run:
+                result["action"] = "DRY RUN: would close"
+                result["note"] = (
+                    f"llm_recommendation={llm_rec!r} — WOULD CLOSE existing "
+                    f"{pos_direction} position (deal_id={pos_deal_id}, size={pos_size})"
+                )
+                logger.info("  WOULD CLOSE %s — %s %s (LLM=%s)", symbol, pos_direction, pos_size, llm_rec)
+            else:
+                try:
+                    close_ref = broker.close_position(pos_deal_id, pos_direction, pos_size)
+                    result["action"] = "CLOSED"
+                    result["deal_ref"] = close_ref
+                    result["note"] = (
+                        f"llm_recommendation={llm_rec!r} — closed {pos_direction} "
+                        f"position (deal_id={pos_deal_id}, size={pos_size}, close_ref={close_ref})"
+                    )
+                    logger.info("  CLOSED %s — %s %s (LLM=%s, close_ref=%s)", symbol, pos_direction, pos_size, llm_rec, close_ref)
+                except Exception as exc:
+                    result["action"] = "CLOSE_FAILED"
+                    result["note"] = f"failed to close position {pos_deal_id}: {exc}"
+                    logger.error("  CLOSE FAILED %s — %s", symbol, exc)
+            return result
+
         result["note"] = f"llm_recommendation={llm_rec!r}"
         logger.info("  SKIPPED %s — %s", symbol, result["note"])
         return result
@@ -237,7 +334,39 @@ def process_instrument(
         return result
 
     result["direction"] = direction
-    side = "BUY" if direction == "LONG" else "SELL"
+    side = _llm_direction_to_ig(direction)
+
+    # --- Position management: existing position + GO ---
+    if existing_pos:
+        pos_direction = existing_pos.get("direction", "")  # BUY or SELL
+        pos_deal_id = existing_pos.get("deal_id", "")
+        pos_size = existing_pos.get("size", 0)
+
+        if pos_direction == side:
+            # Same direction — already open, nothing to do
+            result["action"] = "HELD"
+            result["note"] = f"position already open in same direction ({pos_direction}, deal_id={pos_deal_id})"
+            logger.info("  HELD %s — position already open %s (deal_id=%s)", symbol, pos_direction, pos_deal_id)
+            return result
+
+        # Opposite direction — close old position first, then fall through to place new order
+        if dry_run:
+            logger.info(
+                "  WOULD CLOSE %s — flipping direction: old=%s → new=%s (deal_id=%s, size=%s)",
+                symbol, pos_direction, side, pos_deal_id, pos_size,
+            )
+        else:
+            try:
+                close_ref = broker.close_position(pos_deal_id, pos_direction, pos_size)
+                logger.info(
+                    "  CLOSED %s — flipped direction: old=%s → new=%s (close_ref=%s)",
+                    symbol, pos_direction, side, close_ref,
+                )
+            except Exception as exc:
+                result["action"] = "CLOSE_FAILED"
+                result["note"] = f"failed to close opposite position {pos_deal_id} before flip: {exc}"
+                logger.error("  CLOSE FAILED %s — could not flip: %s", symbol, exc)
+                return result
 
     # --- Stop distance / limit distance from LLM absolute levels ---
     close = float(row.get("close")) if row.get("close") is not None else None
@@ -270,14 +399,23 @@ def process_instrument(
         # Fallback: 2x stop distance
         limit_distance = stop_distance * 2.0
 
+    # --- Scale distances from Yahoo price units to IG points ---
+    if price_factor_map is None:
+        price_factor_map = {}
+    ig_factor = price_factor_map.get(symbol, 1.0)
+    stop_distance = stop_distance * ig_factor
+    limit_distance = limit_distance * ig_factor
+
     # --- Round distances to 1 decimal place (IG rejects excessive precision) ---
     stop_distance = round(stop_distance, 1)
     limit_distance = round(limit_distance, 1)
 
-    # --- Position sizing using LLM risk_pct ---
+    # --- Position sizing using LLM risk_pct (in IG point scale) ---
+    if min_size_map is None:
+        min_size_map = {}
+    inst_min_size = min_size_map.get(symbol, _MIN_SIZE)
     size = _calculate_size(capital, stop_distance, risk_pct)
-
-    epic = epic_map.get(symbol, "")
+    size = max(size, inst_min_size)
 
     logger.info(
         "  %s %s — side=%s size=%.1f stop=%.4f target=%.4f risk=%.1f%% entry_ref=%s epic=%s",
@@ -476,6 +614,8 @@ def main() -> None:
     # Load instruments config (for epic lookup)
     instruments = load_instruments(INSTRUMENTS_CONFIG)
     epic_map = _build_epic_map(instruments)
+    price_factor_map = _build_price_factor_map(instruments)
+    min_size_map = _build_min_size_map(instruments)
 
     # Filter to requested symbol if provided
     if args.symbol:
@@ -503,6 +643,13 @@ def main() -> None:
             sys.exit(1)
         logger.warning("Could not fetch balance (dry run continues with £%.0f): %s", capital, exc)
 
+    # Fetch open positions for position management
+    open_positions = _fetch_open_positions_map(broker, epic_map)
+
+    # NOTE: Instrument processing order could be optimised (e.g. smallest
+    # position size first) to maximise the number of trades placed before
+    # margin runs out.  For now we process in snapshot order.
+
     results: list[dict] = []
     for _, row in snapshot.iterrows():
         result = process_instrument(
@@ -511,6 +658,9 @@ def main() -> None:
             dry_run=dry_run,
             broker=broker,
             capital=capital,
+            open_positions=open_positions,
+            price_factor_map=price_factor_map,
+            min_size_map=min_size_map,
         )
         results.append(result)
 
@@ -522,19 +672,26 @@ def main() -> None:
     # Summary counts
     placed = [r for r in results if r["action"] == "PLACED"]
     would_place = [r for r in results if r["action"] == "DRY RUN: would place"]
-    failed = [r for r in results if r["action"] == "FAILED"]
+    would_close = [r for r in results if r["action"] == "DRY RUN: would close"]
+    failed = [r for r in results if r["action"] in ("FAILED", "CLOSE_FAILED")]
     skipped = [r for r in results if r["action"] == "SKIPPED"]
+    closed = [r for r in results if r["action"] == "CLOSED"]
+    held = [r for r in results if r["action"] == "HELD"]
 
     if dry_run:
         logger.info(
-            "Dry-run complete — would place: %d | skipped: %d",
+            "Dry-run complete — would place: %d | would close: %d | held: %d | skipped: %d",
             len(would_place),
+            len(would_close),
+            len(held),
             len(skipped),
         )
     else:
         logger.info(
-            "Execution complete — placed: %d | failed: %d | skipped: %d",
+            "Execution complete — placed: %d | closed: %d | held: %d | failed: %d | skipped: %d",
             len(placed),
+            len(closed),
+            len(held),
             len(failed),
             len(skipped),
         )

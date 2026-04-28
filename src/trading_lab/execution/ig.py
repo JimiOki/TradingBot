@@ -269,6 +269,83 @@ class IgBrokerAdapter(BrokerAdapter):
             raise RuntimeError(f"Could not fetch IG account balance: {exc}") from exc
 
     # ------------------------------------------------------------------
+    # Position close
+    # ------------------------------------------------------------------
+
+    def close_position(self, deal_id: str, direction: str, size: float) -> str:
+        """Close an open IG position by deal ID.
+
+        Posts to ``/positions/otc`` with a ``_method: DELETE`` header override
+        (IG's documented close-position mechanism).
+
+        Args:
+            deal_id: The IG deal ID of the open position.
+            direction: The direction of the *open* position ("BUY" or "SELL").
+                       The close order is placed in the opposite direction.
+            size: Position size to close.
+
+        Returns:
+            IG deal reference string.
+
+        Raises:
+            RuntimeError: if IG rejects the close request.
+        """
+        ig = self._session()
+
+        close_direction = "SELL" if direction.upper() == "BUY" else "BUY"
+
+        logger.info(
+            "Closing IG position: deal_id=%s open_direction=%s close_direction=%s size=%s",
+            deal_id, direction, close_direction, size,
+        )
+
+        body = {
+            "dealId": deal_id,
+            "direction": close_direction,
+            "size": size,
+            "orderType": "MARKET",
+            "timeInForce": "FILL_OR_KILL",
+        }
+
+        headers = dict(ig.session.headers)
+        headers["Version"] = "1"
+        headers["Content-Type"] = "application/json; charset=UTF-8"
+        headers["Accept"] = "application/json; charset=UTF-8"
+        headers["_method"] = "DELETE"
+
+        resp = requests.post(
+            f"{ig.BASE_URL}/positions/otc",
+            json=body,
+            headers=headers,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+
+        deal_ref = result.get("dealReference", "")
+        if not deal_ref:
+            raise RuntimeError(f"IG returned no deal reference on close: {result}")
+
+        # Fetch deal confirmation to verify the close was accepted.
+        try:
+            confirm = ig.fetch_deal_by_deal_reference(deal_ref)
+            deal_status = confirm.get("dealStatus", "UNKNOWN")
+            reason = confirm.get("reason", "")
+            if deal_status != "ACCEPTED":
+                raise RuntimeError(
+                    f"IG rejected close {deal_ref}: status={deal_status} reason={reason}"
+                )
+            logger.info("IG position closed — deal_reference=%s", deal_ref)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "Could not fetch confirm for close %s: %s — treating as closed",
+                deal_ref, exc,
+            )
+
+        return deal_ref
+
+    # ------------------------------------------------------------------
     # Order placement
     # ------------------------------------------------------------------
 

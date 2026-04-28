@@ -12,7 +12,9 @@ instruments:
     session_close: "17:00"
     adjusted_prices: false
     ig_epic: "CS.D.USCGC.TODAY.IP"   # Spot Gold, undated DFB
-    ig_sentiment_id: "GOLD"
+    ig_sentiment_id: "GC"
+    ig_price_factor: 1               # IG and Yahoo both quote in USD/oz
+    ig_min_size: 1.0
 
   - symbol: "CL=F"
     name: Crude Oil (WTI)
@@ -24,7 +26,8 @@ instruments:
     session_close: "17:00"
     adjusted_prices: false
     ig_epic: "CC.D.CL.USS.IP"        # Oil - US Crude, undated DFB
-    ig_sentiment_id: "OIL_CRUDE"
+    ig_sentiment_id: "CL"
+    ig_price_factor: 100              # Yahoo USD/barrel → IG cents/barrel
 
   - symbol: "SI=F"
     name: Silver
@@ -36,7 +39,8 @@ instruments:
     session_close: "17:00"
     adjusted_prices: false
     ig_epic: "CS.D.USCSI.TODAY.IP"   # Spot Silver, undated DFB
-    ig_sentiment_id: "SILVER"
+    ig_sentiment_id: "SI"
+    ig_price_factor: 1               # IG and Yahoo both quote in USD/oz
 
   - symbol: "HG=F"
     name: Copper
@@ -49,6 +53,8 @@ instruments:
     adjusted_prices: false
     ig_epic: "CS.D.COPPER.TODAY.IP"  # Copper, undated DFB
     ig_sentiment_id: "COPPER"
+    ig_price_factor: 2205             # Yahoo USD/lb → IG USD/tonne (approx)
+    ig_min_size: 1.0
 
   - symbol: "NG=F"
     name: Natural Gas
@@ -60,7 +66,8 @@ instruments:
     session_close: "17:00"
     adjusted_prices: false
     ig_epic: "CC.D.NG.USS.IP"        # Natural Gas, undated DFB
-    ig_sentiment_id: "NATURALGAS"
+    ig_sentiment_id: "NG"
+    ig_price_factor: 1000             # Yahoo USD/MMBtu → IG 0.001 USD/therm
 
   - symbol: "^FTSE"
     name: FTSE 100
@@ -72,7 +79,7 @@ instruments:
     session_close: "16:30"
     adjusted_prices: false
     ig_epic: "IX.D.FTSE.DAILY.IP"    # FTSE 100, undated DFB
-    ig_sentiment_id: "FTSE"
+    ig_sentiment_id: "FT100"
 
   - symbol: "^GSPC"
     name: S&P 500
@@ -108,7 +115,7 @@ instruments:
     session_close: "17:30"
     adjusted_prices: false
     ig_epic: "IX.D.DAX.DAILY.IP"     # Germany 40, undated DFB
-    ig_sentiment_id: "DAX"
+    ig_sentiment_id: "DE30"
 
   - symbol: "^N225"
     name: Nikkei 225
@@ -120,7 +127,7 @@ instruments:
     session_close: "15:30"
     adjusted_prices: false
     ig_epic: "IX.D.NIKKEI.DAILY.IP"  # Japan 225, undated DFB
-    ig_sentiment_id: "NIKKEI"
+    ig_sentiment_id: "JP225"
 
   - symbol: "^DJI"
     name: Dow Jones
@@ -132,4 +139,4 @@ instruments:
     session_close: "16:00"
     adjusted_prices: false
     ig_epic: "IX.D.DOW.DAILY.IP"     # Wall Street, undated DFB
-    ig_sentiment_id: "WALLSTREET"
+    ig_sentiment_id: "WALL"
