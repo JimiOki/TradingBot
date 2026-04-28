@@ -25,6 +25,8 @@ import logging
 import os
 from dataclasses import dataclass
 
+import requests
+
 from trading_lab.execution.broker_base import BrokerAdapter, OrderRequest
 
 logger = logging.getLogger(__name__)
@@ -60,9 +62,10 @@ def _build_ig_service():
             "IG credentials missing. Set IG_API_KEY, IG_USERNAME, IG_PASSWORD in .env"
         )
 
-    ig = IGService(username, password, api_key, acc_type)
-    ig.create_session()
-    logger.info("IG session created (account_type=%s)", acc_type)
+    acc_number = os.environ.get("IG_ACCOUNT_ID", "")
+    ig = IGService(username, password, api_key, acc_type, acc_number=acc_number)
+    ig.create_session(version="3")
+    logger.info("IG session created (account_type=%s, version=3)", acc_type)
     return ig
 
 
@@ -84,9 +87,10 @@ def _build_ig_service_live():
             "IG_LIVE_PASSWORD in .env"
         )
 
-    ig = IGService(username, password, api_key, "LIVE")
-    ig.create_session()
-    logger.info("IG LIVE session created for data fetching")
+    acc_number = os.environ.get("IG_LIVE_ACCOUNT_ID", "")
+    ig = IGService(username, password, api_key, "LIVE", acc_number=acc_number)
+    ig.create_session(version="3")
+    logger.info("IG LIVE session created for data fetching (version=3)")
     return ig
 
 
@@ -222,6 +226,49 @@ class IgBrokerAdapter(BrokerAdapter):
             return []
 
     # ------------------------------------------------------------------
+    # Account balance
+    # ------------------------------------------------------------------
+
+    def fetch_balance(self) -> float:
+        """Return available balance (cash minus margin) for the active account.
+
+        Uses ``IGService.fetch_accounts()`` which returns a DataFrame with
+        one row per account.  Finds the row matching the configured account
+        ID and returns the ``available`` column value (GBP for spreadbet
+        accounts).
+
+        Raises RuntimeError if the balance cannot be determined.
+        """
+        try:
+            ig = self._session()
+            df = ig.fetch_accounts()
+            if df is None or (hasattr(df, "empty") and df.empty):
+                raise RuntimeError("IG returned no accounts")
+
+            # Try to match configured account ID
+            acc_id = os.environ.get(
+                "IG_LIVE_ACCOUNT_ID" if self._live else "IG_ACCOUNT_ID", ""
+            )
+            if acc_id and "accountId" in df.columns:
+                match = df[df["accountId"] == acc_id]
+                if not match.empty:
+                    df = match
+
+            # Take the first (or only) matching account
+            row = df.iloc[0]
+            available = float(row.get("available", 0) or 0)
+            logger.info(
+                "IG account %s balance: available=%.2f",
+                row.get("accountId", "?"),
+                available,
+            )
+            return available
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"Could not fetch IG account balance: {exc}") from exc
+
+    # ------------------------------------------------------------------
     # Order placement
     # ------------------------------------------------------------------
 
@@ -243,37 +290,48 @@ class IgBrokerAdapter(BrokerAdapter):
             raise ValueError(f"OrderRequest for {order.symbol} has no epic — check instruments.yaml")
 
         ig = self._session()
-        account_id = os.environ.get("IG_ACCOUNT_ID", "")
 
         logger.info(
             "Placing IG order: epic=%s side=%s size=%s stop_dist=%s limit_dist=%s",
             order.epic, order.side, order.size, order.stop_distance, order.limit_distance,
         )
 
-        response = ig.create_open_position(
-            currency_code="GBP",
-            direction=order.side,          # "BUY" or "SELL"
-            epic=order.epic,
-            expiry="-",                    # undated spreadbet
-            force_open=True,
-            guaranteed_stop=False,
-            level=None,
-            limit_distance=order.limit_distance,
-            limit_level=None,
-            order_type="MARKET",
-            quote_id=None,
-            size=order.size,
-            stop_distance=order.stop_distance,
-            stop_level=None,
-            trailing_stop=False,
-            trailing_stop_increment=None,
+        # Build a clean request body — no null fields.  The trading_ig
+        # library's create_open_position() sends null fields that IG's
+        # spreadbet engine rejects (REJECT_CFD_ORDER_ON_SPREADBET_ACCOUNT).
+        body = {
+            "currencyCode": "GBP",
+            "direction": order.side,          # "BUY" or "SELL"
+            "epic": order.epic,
+            "expiry": "DFB",                  # Daily Funded Bet — required for spreadbets
+            "forceOpen": True,
+            "guaranteedStop": False,
+            "orderType": "MARKET",
+            "size": order.size,
+            "stopDistance": order.stop_distance,
+            "limitDistance": order.limit_distance,
+        }
+
+        # Use the library's authenticated session headers (OAuth Bearer token)
+        # and POST directly to avoid the library injecting null fields.
+        headers = dict(ig.session.headers)
+        headers["Version"] = "2"
+        headers["Content-Type"] = "application/json; charset=UTF-8"
+        headers["Accept"] = "application/json; charset=UTF-8"
+
+        resp = requests.post(
+            f"{ig.BASE_URL}/positions/otc",
+            json=body,
+            headers=headers,
         )
+        resp.raise_for_status()
+        result = resp.json()
 
-        deal_ref = response.get("dealReference", "")
+        deal_ref = result.get("dealReference", "")
         if not deal_ref:
-            raise RuntimeError(f"IG returned no deal reference: {response}")
+            raise RuntimeError(f"IG returned no deal reference: {result}")
 
-        # Check the deal confirmation to see if IG actually accepted the order.
+        # Fetch deal confirmation to verify acceptance.
         try:
             confirm = ig.fetch_deal_by_deal_reference(deal_ref)
             deal_status = confirm.get("dealStatus", "UNKNOWN")

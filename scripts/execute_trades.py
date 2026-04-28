@@ -52,8 +52,9 @@ logger = logging.getLogger("execute_trades")
 SNAPSHOT_PATH = SIGNALS_DATA_DIR / "portfolio_snapshot.parquet"
 
 # Position-sizing constants
-_CAPITAL_GBP = 10_000.0
 _MIN_SIZE = 0.5
+_MAX_SIZE = 50.0          # sensible ceiling — IG rejects huge auto sizes
+_RETRY_HALVE_REASONS = {"INSUFFICIENT_FUNDS", "MAX_AUTO_SIZE_EXCEEDED"}
 
 # Maximum age of snapshot before we refuse to trade
 _MAX_STALENESS_DAYS = 2
@@ -144,13 +145,13 @@ def _load_decision(symbol: str, signal_date: date) -> dict | None:
         return None
 
 
-def _calculate_size(stop_distance: float, risk_pct: float = 1.0) -> float:
-    """Return £/point size, minimum 0.5, rounded to 1 decimal place."""
-    gbp_risk = _CAPITAL_GBP * risk_pct / 100
+def _calculate_size(capital: float, stop_distance: float, risk_pct: float = 1.0) -> float:
+    """Return £/point size, clamped to [_MIN_SIZE, _MAX_SIZE], rounded to 1 dp."""
+    gbp_risk = capital * risk_pct / 100
     if stop_distance <= 0:
         return _MIN_SIZE
     raw = gbp_risk / stop_distance
-    return max(_MIN_SIZE, round(raw, 1))
+    return max(_MIN_SIZE, min(_MAX_SIZE, round(raw, 1)))
 
 
 def _signal_date_for_row(row: pd.Series) -> date | None:
@@ -176,6 +177,7 @@ def process_instrument(
     *,
     dry_run: bool,
     broker: IgBrokerAdapter | None,
+    capital: float,
 ) -> dict:
     """Evaluate one snapshot row and optionally place an order.
 
@@ -268,19 +270,14 @@ def process_instrument(
         # Fallback: 2x stop distance
         limit_distance = stop_distance * 2.0
 
+    # --- Round distances to 1 decimal place (IG rejects excessive precision) ---
+    stop_distance = round(stop_distance, 1)
+    limit_distance = round(limit_distance, 1)
+
     # --- Position sizing using LLM risk_pct ---
-    size = _calculate_size(stop_distance, risk_pct)
+    size = _calculate_size(capital, stop_distance, risk_pct)
 
     epic = epic_map.get(symbol, "")
-
-    order = OrderRequest(
-        symbol=symbol,
-        epic=epic,
-        side=side,
-        size=size,
-        stop_distance=stop_distance,
-        limit_distance=limit_distance,
-    )
 
     logger.info(
         "  %s %s — side=%s size=%.1f stop=%.4f target=%.4f risk=%.1f%% entry_ref=%s epic=%s",
@@ -303,42 +300,78 @@ def process_instrument(
         )
         return result
 
-    # --- Place order (live) ---
-    try:
-        deal_ref = broker.place_order(order)
-        result["action"] = "PLACED"
-        result["deal_ref"] = deal_ref
-        result["note"] = (
-            f"deal_ref={deal_ref} stop={llm_stop} target={llm_tp} "
-            f"risk={risk_pct}% entry_ref={entry_level}"
-        )
+    # --- Place order (live) with retry-on-halve for size rejections ---
+    max_attempts = 3
+    current_size = size
 
-        log_event(
-            _ORDER_AUDIT_ACTION,
-            instrument=symbol,
-            values={
-                "deal_ref": deal_ref,
-                "side": side,
-                "direction": direction,
-                "size": size,
-                "stop_distance": stop_distance,
-                "limit_distance": limit_distance,
-                "stop_loss": llm_stop,
-                "take_profit": llm_tp,
-                "risk_pct": risk_pct,
-                "entry_level": entry_level,
-                "epic": epic,
-                "signal": result["signal"],
-                "signal_date": str(signal_date),
-                "llm_recommendation": llm_rec,
-            },
+    for attempt in range(1, max_attempts + 1):
+        order = OrderRequest(
+            symbol=symbol,
+            epic=epic,
+            side=side,
+            size=current_size,
+            stop_distance=stop_distance,
+            limit_distance=limit_distance,
         )
-        logger.info("  ORDER PLACED %s — deal_ref=%s", symbol, deal_ref)
+        try:
+            deal_ref = broker.place_order(order)
+            result["action"] = "PLACED"
+            result["deal_ref"] = deal_ref
+            result["note"] = (
+                f"deal_ref={deal_ref} stop={llm_stop} target={llm_tp} "
+                f"risk={risk_pct}% size={current_size} entry_ref={entry_level}"
+            )
 
-    except Exception as exc:
-        result["action"] = "FAILED"
-        result["note"] = str(exc)
-        logger.error("  ORDER FAILED %s — %s", symbol, exc)
+            log_event(
+                _ORDER_AUDIT_ACTION,
+                instrument=symbol,
+                values={
+                    "deal_ref": deal_ref,
+                    "side": side,
+                    "direction": direction,
+                    "size": current_size,
+                    "stop_distance": stop_distance,
+                    "limit_distance": limit_distance,
+                    "stop_loss": llm_stop,
+                    "take_profit": llm_tp,
+                    "risk_pct": risk_pct,
+                    "entry_level": entry_level,
+                    "epic": epic,
+                    "signal": result["signal"],
+                    "signal_date": str(signal_date),
+                    "llm_recommendation": llm_rec,
+                },
+            )
+            logger.info("  ORDER PLACED %s — deal_ref=%s (size=%.1f)", symbol, deal_ref, current_size)
+            break
+
+        except RuntimeError as exc:
+            reason = str(exc)
+            # Check if the rejection reason is retryable by halving size
+            retryable = any(r in reason for r in _RETRY_HALVE_REASONS)
+            if retryable and attempt < max_attempts:
+                new_size = round(current_size / 2, 1)
+                if new_size < _MIN_SIZE:
+                    result["action"] = "FAILED"
+                    result["note"] = f"{reason} (halved below min size {_MIN_SIZE})"
+                    logger.error("  ORDER FAILED %s — %s (cannot halve further)", symbol, reason)
+                    break
+                logger.warning(
+                    "  ORDER REJECTED %s — %s — halving size %.1f → %.1f (attempt %d/%d)",
+                    symbol, reason, current_size, new_size, attempt, max_attempts,
+                )
+                current_size = new_size
+            else:
+                result["action"] = "FAILED"
+                result["note"] = reason
+                logger.error("  ORDER FAILED %s — %s", symbol, reason)
+                break
+
+        except Exception as exc:
+            result["action"] = "FAILED"
+            result["note"] = str(exc)
+            logger.error("  ORDER FAILED %s — %s", symbol, exc)
+            break
 
     return result
 
@@ -455,16 +488,20 @@ def main() -> None:
     logger.info("Processing %d instrument(s).", len(snapshot))
     logger.info("=" * 60)
 
-    # Initialise broker only for live runs (avoids unnecessary IG auth in dry run)
+    # Initialise broker and fetch account balance.
+    # We always connect (even dry run) so we can show the real capital figure.
     broker: IgBrokerAdapter | None = None
-    if not dry_run:
-        try:
-            broker = IgBrokerAdapter()
-            # Force an early auth check so we fail fast before iterating rows.
-            broker._session()
-        except RuntimeError as exc:
+    capital: float = 10_000.0  # fallback if broker unavailable
+    try:
+        broker = IgBrokerAdapter()
+        broker._session()  # force early auth check
+        capital = broker.fetch_balance()
+        logger.info("Account capital: £%.2f", capital)
+    except RuntimeError as exc:
+        if not dry_run:
             logger.error("Cannot connect to IG: %s", exc)
             sys.exit(1)
+        logger.warning("Could not fetch balance (dry run continues with £%.0f): %s", capital, exc)
 
     results: list[dict] = []
     for _, row in snapshot.iterrows():
@@ -473,6 +510,7 @@ def main() -> None:
             epic_map,
             dry_run=dry_run,
             broker=broker,
+            capital=capital,
         )
         results.append(result)
 
