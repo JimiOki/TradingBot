@@ -26,8 +26,8 @@ def fetch_ig_sentiment_headline(instrument: dict) -> dict | None:
         A headline dict {title, source, timestamp} compatible with
         SignalContext.news_headlines, or None if sentiment is unavailable.
     """
-    # Skip if IG credentials not configured
-    if not os.environ.get("IG_API_KEY"):
+    # Skip if live IG credentials not configured (sentiment needs the live API)
+    if not os.environ.get("IG_LIVE_API_KEY"):
         return None
 
     sentiment_id = instrument.get("ig_sentiment_id")
@@ -36,7 +36,7 @@ def fetch_ig_sentiment_headline(instrument: dict) -> dict | None:
 
     try:
         from trading_lab.execution.ig import IgBrokerAdapter
-        adapter = IgBrokerAdapter()
+        adapter = IgBrokerAdapter(live=True)
         sentiment = adapter.fetch_sentiment(sentiment_id)
         if sentiment is None:
             return None

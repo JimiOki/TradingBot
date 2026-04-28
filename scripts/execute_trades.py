@@ -51,10 +51,8 @@ logger = logging.getLogger("execute_trades")
 # Snapshot written by run_signals.py
 SNAPSHOT_PATH = SIGNALS_DATA_DIR / "portfolio_snapshot.parquet"
 
-# Position-sizing constants (Phase 1 — hardcoded)
+# Position-sizing constants
 _CAPITAL_GBP = 10_000.0
-_RISK_PCT = 1.0          # 1 % per trade
-_GBP_RISK = _CAPITAL_GBP * _RISK_PCT / 100   # £100
 _MIN_SIZE = 0.5
 
 # Maximum age of snapshot before we refuse to trade
@@ -146,28 +144,13 @@ def _load_decision(symbol: str, signal_date: date) -> dict | None:
         return None
 
 
-def _calculate_size(stop_distance: float) -> float:
+def _calculate_size(stop_distance: float, risk_pct: float = 1.0) -> float:
     """Return £/point size, minimum 0.5, rounded to 1 decimal place."""
+    gbp_risk = _CAPITAL_GBP * risk_pct / 100
     if stop_distance <= 0:
         return _MIN_SIZE
-    raw = _GBP_RISK / stop_distance
+    raw = gbp_risk / stop_distance
     return max(_MIN_SIZE, round(raw, 1))
-
-
-def _calculate_limit_distance(row: pd.Series) -> float:
-    """Derive limit_distance from take_profit and close, or fall back to 2x stop."""
-    try:
-        tp = float(row.get("take_profit_level")) if row.get("take_profit_level") is not None else None
-        close = float(row.get("close")) if row.get("close") is not None else None
-        stop = float(row.get("stop_distance")) if row.get("stop_distance") is not None else 0.0
-
-        if tp is not None and close is not None and close != 0:
-            return abs(tp - close)
-    except (TypeError, ValueError):
-        pass
-
-    stop = float(row.get("stop_distance", 0) or 0)
-    return stop * 2.0
 
 
 def _signal_date_for_row(row: pd.Series) -> date | None:
@@ -203,6 +186,7 @@ def process_instrument(
     result = {
         "symbol": symbol,
         "signal": None,
+        "direction": None,
         "decision": None,
         "action": "SKIPPED",
         "note": "",
@@ -216,29 +200,10 @@ def process_instrument(
         logger.info("  SKIPPED %s — %s", symbol, result["note"])
         return result
 
-    # --- Filter: signal ---
+    # --- Record signal (informational only — no longer gates execution) ---
     raw_signal = row.get("signal")
-    if raw_signal is None or pd.isna(raw_signal):
-        result["note"] = "signal=None"
-        logger.info("  SKIPPED %s — %s", symbol, result["note"])
-        return result
-
-    signal = int(raw_signal)
-    result["signal"] = signal
-
-    if signal == 0:
-        result["note"] = "signal=0 (FLAT)"
-        logger.info("  SKIPPED %s — %s", symbol, result["note"])
-        return result
-
-    # --- Filter: stop_distance ---
-    raw_stop = row.get("stop_distance")
-    if raw_stop is None or pd.isna(raw_stop) or float(raw_stop) <= 0:
-        result["note"] = f"stop_distance={raw_stop!r} (not > 0)"
-        logger.info("  SKIPPED %s — %s", symbol, result["note"])
-        return result
-
-    stop_distance = float(raw_stop)
+    if raw_signal is not None and not pd.isna(raw_signal):
+        result["signal"] = int(raw_signal)
 
     # --- Filter: LLM decision ---
     signal_date = _signal_date_for_row(row)
@@ -262,11 +227,51 @@ def process_instrument(
         logger.info("  SKIPPED %s — %s", symbol, result["note"])
         return result
 
-    # --- Build OrderRequest ---
+    # --- Direction from LLM ---
+    direction = decision.get("direction")
+    if direction not in ("LONG", "SHORT"):
+        result["note"] = f"invalid direction={direction!r} in LLM decision"
+        logger.warning("  SKIPPED %s — %s", symbol, result["note"])
+        return result
+
+    result["direction"] = direction
+    side = "BUY" if direction == "LONG" else "SELL"
+
+    # --- Stop distance / limit distance from LLM absolute levels ---
+    close = float(row.get("close")) if row.get("close") is not None else None
+
+    llm_stop = decision.get("stop_loss")
+    llm_tp = decision.get("take_profit")
+    risk_pct = decision.get("risk_pct", 1.0)
+    entry_level = decision.get("entry_level")
+
+    if llm_stop is not None and close is not None and not pd.isna(float(llm_stop)):
+        stop_distance = abs(close - float(llm_stop))
+    else:
+        # Fallback to snapshot's stop_distance for backwards compat
+        raw_stop = row.get("stop_distance")
+        if raw_stop is not None and not pd.isna(raw_stop) and float(raw_stop) > 0:
+            stop_distance = float(raw_stop)
+        else:
+            result["note"] = "no stop_loss from LLM and no stop_distance in snapshot"
+            logger.info("  SKIPPED %s — %s", symbol, result["note"])
+            return result
+
+    if stop_distance <= 0:
+        result["note"] = f"stop_distance={stop_distance} (not > 0)"
+        logger.info("  SKIPPED %s — %s", symbol, result["note"])
+        return result
+
+    if llm_tp is not None and close is not None:
+        limit_distance = abs(float(llm_tp) - close)
+    else:
+        # Fallback: 2x stop distance
+        limit_distance = stop_distance * 2.0
+
+    # --- Position sizing using LLM risk_pct ---
+    size = _calculate_size(stop_distance, risk_pct)
+
     epic = epic_map.get(symbol, "")
-    side = "BUY" if signal == 1 else "SELL"
-    size = _calculate_size(stop_distance)
-    limit_distance = _calculate_limit_distance(row)
 
     order = OrderRequest(
         symbol=symbol,
@@ -278,21 +283,23 @@ def process_instrument(
     )
 
     logger.info(
-        "  %s %s — side=%s size=%.1f stop_dist=%.4f limit_dist=%.4f epic=%s",
+        "  %s %s — side=%s size=%.1f stop=%.4f target=%.4f risk=%.1f%% entry_ref=%s epic=%s",
         "WOULD PLACE" if dry_run else "PLACING",
         symbol,
         side,
         size,
         stop_distance,
         limit_distance,
+        risk_pct,
+        entry_level if entry_level is not None else "N/A",
         epic or "(no epic)",
     )
 
     if dry_run:
         result["action"] = "DRY RUN: would place"
         result["note"] = (
-            f"side={side} size={size} stop_dist={stop_distance:.4f} "
-            f"limit_dist={limit_distance:.4f} epic={epic or 'MISSING'}"
+            f"side={side} size={size} stop={llm_stop} target={llm_tp} "
+            f"risk={risk_pct}% entry_ref={entry_level} epic={epic or 'MISSING'}"
         )
         return result
 
@@ -301,7 +308,10 @@ def process_instrument(
         deal_ref = broker.place_order(order)
         result["action"] = "PLACED"
         result["deal_ref"] = deal_ref
-        result["note"] = f"deal_ref={deal_ref}"
+        result["note"] = (
+            f"deal_ref={deal_ref} stop={llm_stop} target={llm_tp} "
+            f"risk={risk_pct}% entry_ref={entry_level}"
+        )
 
         log_event(
             _ORDER_AUDIT_ACTION,
@@ -309,11 +319,16 @@ def process_instrument(
             values={
                 "deal_ref": deal_ref,
                 "side": side,
+                "direction": direction,
                 "size": size,
                 "stop_distance": stop_distance,
                 "limit_distance": limit_distance,
+                "stop_loss": llm_stop,
+                "take_profit": llm_tp,
+                "risk_pct": risk_pct,
+                "entry_level": entry_level,
                 "epic": epic,
-                "signal": signal,
+                "signal": result["signal"],
                 "signal_date": str(signal_date),
                 "llm_recommendation": llm_rec,
             },
@@ -337,6 +352,7 @@ def _print_results_table(results: list[dict]) -> None:
     col_widths = {
         "symbol": 10,
         "signal": 7,
+        "direction": 9,
         "decision": 12,
         "action": 28,
         "note": 60,
@@ -345,6 +361,7 @@ def _print_results_table(results: list[dict]) -> None:
     header = (
         f"{'SYMBOL':<{col_widths['symbol']}}  "
         f"{'SIGNAL':<{col_widths['signal']}}  "
+        f"{'DIR':<{col_widths['direction']}}  "
         f"{'DECISION':<{col_widths['decision']}}  "
         f"{'ACTION':<{col_widths['action']}}  "
         f"{'NOTE':<{col_widths['note']}}"
@@ -358,9 +375,11 @@ def _print_results_table(results: list[dict]) -> None:
 
     for r in results:
         sig_str = {1: "LONG", -1: "SHORT", 0: "FLAT"}.get(r["signal"], str(r["signal"]))
+        dir_str = r.get("direction") or ""
         print(
             f"{r['symbol']:<{col_widths['symbol']}}  "
             f"{sig_str:<{col_widths['signal']}}  "
+            f"{dir_str:<{col_widths['direction']}}  "
             f"{str(r['decision'] or ''):<{col_widths['decision']}}  "
             f"{r['action']:<{col_widths['action']}}  "
             f"{r['note']:<{col_widths['note']}}"

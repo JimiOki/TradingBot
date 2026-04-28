@@ -62,9 +62,9 @@ the strategy consensus, and what the main risk to this signal is.
 """
 
 DECISION_PROMPT = """\
-You are a discretionary trader making a trading decision for {instrument_name} ({symbol}). \
+You are a discretionary spread-betting trader making a trading decision for {instrument_name} ({symbol}). \
 You have been given technical evidence, news, and market sentiment. Your job is to weigh \
-all of it and reach a conviction. The technical signals are one input — not the answer.
+all of it, reach a conviction, and specify the trade parameters if acting.
 
 ## Technical Evidence
 - Date: {signal_date}
@@ -82,6 +82,11 @@ all of it and reach a conviction. The technical signals are one input — not th
 - If IG client sentiment strongly opposes your intended direction (>70% on the other side), note it — \
   it may be a contrarian signal or a warning
 - UNCERTAIN should only be used when evidence genuinely pulls equally in both directions — be decisive
+- Set stop_loss at a level that invalidates your thesis — use the suggested stop as a reference but adjust \
+  based on key technical levels (support/resistance, SMA lines, recent swing highs/lows)
+- Set take_profit at a realistic target — the suggested target is a starting point
+- Set risk_pct between 0.5 and 3.0 based on your conviction: low conviction = 0.5-1.0, \
+  moderate = 1.0-2.0, high conviction = 2.0-3.0
 
 Respond ONLY with a JSON object. No text outside the JSON.
 
@@ -89,11 +94,17 @@ Required format:
 {{
   "recommendation": "GO" | "NO_GO" | "UNCERTAIN",
   "direction": "LONG" | "SHORT" | null,
+  "entry_level": <float or null>,
+  "stop_loss": <float or null>,
+  "take_profit": <float or null>,
+  "risk_pct": <float or null>,
   "rationale": "2-3 sentences covering the key technical picture, the most relevant news or sentiment factor, and why you landed here",
   "conflicts_with_technical": true | false
 }}
 
-direction must be set to LONG or SHORT when recommendation is GO, and null otherwise.
+When recommendation is GO: direction, entry_level, stop_loss, take_profit, and risk_pct must all be set.
+When recommendation is NO_GO or UNCERTAIN: direction, entry_level, stop_loss, take_profit, and risk_pct must be null.
+conflicts_with_technical should be true ONLY when the technical consensus has a clear directional signal (majority of strategies agree on LONG or SHORT) and your direction opposes it. When the technical consensus is neutral/flat, set this to false — choosing a direction when technicals are inconclusive is not a conflict.
 """
 
 

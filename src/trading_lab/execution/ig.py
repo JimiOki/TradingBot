@@ -1,10 +1,14 @@
 """IG broker adapter — authentication, order placement, and client sentiment.
 
-Supports demo and live accounts via IG_DEMO environment variable.
+Supports demo and live accounts.  By default the adapter connects to the DEMO
+account (for trade execution).  Pass ``live=True`` to connect to the LIVE
+account (for market-data fetching such as sentiment and prices).
 
 Usage::
 
-    adapter = IgBrokerAdapter()
+    adapter = IgBrokerAdapter()            # demo — trade execution
+    adapter = IgBrokerAdapter(live=True)   # live — data fetching
+
     sentiment = adapter.fetch_sentiment("CS.D.CFDGOLD.CFD.IP")
     deal_ref = adapter.place_order(OrderRequest(
         symbol="GC=F",
@@ -43,9 +47,8 @@ class IgSentiment:
 
 
 def _build_ig_service():
-    """Create and authenticate an IGService instance from environment variables."""
+    """Create and authenticate an IGService instance (DEMO) from environment variables."""
     from trading_ig import IGService
-    from trading_ig.rest import ApiExceededException
 
     api_key = os.environ.get("IG_API_KEY", "")
     username = os.environ.get("IG_USERNAME", "")
@@ -63,16 +66,49 @@ def _build_ig_service():
     return ig
 
 
-class IgBrokerAdapter(BrokerAdapter):
-    """IG REST API adapter for order placement and client sentiment."""
+def _build_ig_service_live():
+    """Create and authenticate an IGService instance for the LIVE account.
 
-    def __init__(self) -> None:
+    Reads IG_LIVE_* environment variables.  Used for market-data fetching
+    (sentiment, prices) where the demo API returns incomplete data.
+    """
+    from trading_ig import IGService
+
+    api_key = os.environ.get("IG_LIVE_API_KEY", "")
+    username = os.environ.get("IG_LIVE_USERNAME", "")
+    password = os.environ.get("IG_LIVE_PASSWORD", "")
+
+    if not all([api_key, username, password]):
+        raise RuntimeError(
+            "Live IG credentials missing. Set IG_LIVE_API_KEY, IG_LIVE_USERNAME, "
+            "IG_LIVE_PASSWORD in .env"
+        )
+
+    ig = IGService(username, password, api_key, "LIVE")
+    ig.create_session()
+    logger.info("IG LIVE session created for data fetching")
+    return ig
+
+
+class IgBrokerAdapter(BrokerAdapter):
+    """IG REST API adapter for order placement and client sentiment.
+
+    Args:
+        live: If True, connect to the LIVE account using IG_LIVE_* env vars.
+              Default False connects to demo for trade execution.
+    """
+
+    def __init__(self, live: bool = False) -> None:
         self._ig = None  # lazy — only connect when needed
+        self._live = live
 
     def _session(self):
         """Return an authenticated IGService, creating one if needed."""
         if self._ig is None:
-            self._ig = _build_ig_service()
+            if self._live:
+                self._ig = _build_ig_service_live()
+            else:
+                self._ig = _build_ig_service()
         return self._ig
 
     # ------------------------------------------------------------------
@@ -237,5 +273,19 @@ class IgBrokerAdapter(BrokerAdapter):
         if not deal_ref:
             raise RuntimeError(f"IG returned no deal reference: {response}")
 
-        logger.info("IG order placed — deal_reference=%s", deal_ref)
+        # Check the deal confirmation to see if IG actually accepted the order.
+        try:
+            confirm = ig.fetch_deal_by_deal_reference(deal_ref)
+            deal_status = confirm.get("dealStatus", "UNKNOWN")
+            reason = confirm.get("reason", "")
+            if deal_status != "ACCEPTED":
+                raise RuntimeError(
+                    f"IG rejected order {deal_ref}: status={deal_status} reason={reason}"
+                )
+            logger.info("IG order ACCEPTED — deal_reference=%s", deal_ref)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            logger.warning("Could not fetch confirm for %s: %s — treating as placed", deal_ref, exc)
+
         return deal_ref

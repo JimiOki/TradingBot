@@ -3,8 +3,13 @@
   "signal_date": "2026-04-27",
   "signal": 0,
   "llm_recommendation": "GO",
-  "rationale": "Despite a weak technical consensus with only 1 of 6 strategies agreeing on a SHORT direction, recent news provides a strong bearish catalyst. Headlines from April 27th explicitly state the DAX is 'experiencing significant drops,' supported by earlier reports of 'deepening economic woes' and the 'Strait of Hormuz Remaining Closed,' which are significant macro headwinds. This strong, current market sentiment overrides the weak technical agreement and an older, conflicting bullish news item.",
+  "direction": "SHORT",
+  "entry_level": 24277.9902,
+  "stop_loss": 24881.241,
+  "take_profit": 23071.4888,
+  "risk_pct": 1.5,
+  "rationale": "The most recent news (April 27th) indicates the DAX has experienced significant drops and challenges, signaling a bearish market sentiment. While the majority of strategy signals are neutral, the implied risk/reward from the suggested technical stop and target strongly supports a short position, further reinforced by the EMA crossover signal. This suggests a continuation of recent downward pressure for the index.",
   "conflicts_with_technical": false,
-  "generated_at": "2026-04-27T09:28:12.945313+00:00",
+  "generated_at": "2026-04-27T10:26:17.670952+00:00",
   "model": "gemini-2.5-flash"
 }

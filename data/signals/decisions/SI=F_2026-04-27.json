@@ -2,9 +2,14 @@
   "symbol": "SI=F",
   "signal_date": "2026-04-27",
   "signal": 0,
-  "llm_recommendation": "NO_GO",
-  "rationale": "The technical signal indicates SHORT with 75% confidence and a good R/R, however, only 1 out of 6 independent strategies agrees, making it a weak technical case according to the decision rules. The news headlines do not provide a strong catalyst to support the short position; rather, some suggest recent precious metals price increases and positive developments for silver miners, creating conflicting sentiment. Without a strong news catalyst to bolster the weak technical consensus, there is insufficient conviction to act on the signal.",
-  "conflicts_with_technical": true,
-  "generated_at": "2026-04-27T09:24:48.457118+00:00",
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 75.62,
+  "stop_loss": 80.279,
+  "take_profit": 66.302,
+  "risk_pct": 1.5,
+  "rationale": "Technical indicators show a weak bearish bias with the close below the fast SMA and one strategy signaling SHORT, though overall consensus is mostly neutral. Recent news indicates silver's stability after a week of negative performance for precious metals, suggesting a potential continuation of weakness without strong bullish catalysts. Given the slight technical lean and lack of positive news, combined with an attractive 2.0x risk/reward, a short position is warranted.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-27T10:24:02.201023+00:00",
   "model": "gemini-2.5-flash"
 }

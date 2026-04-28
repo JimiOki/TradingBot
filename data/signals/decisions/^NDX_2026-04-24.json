@@ -2,9 +2,14 @@
   "symbol": "^NDX",
   "signal_date": "2026-04-24",
   "signal": 0,
-  "llm_recommendation": "NO_GO",
-  "rationale": "The technical signal to SHORT lacks any conviction, showing 0/100 confidence and zero agreement from all six independent strategies, indicating an extremely weak systematic case. While RSI is overbought, the NASDAQ 100 was making new all-time highs on the signal date (2026-04-24), fundamentally contradicting a short position at that time. Although subsequent news points to minor dips in futures due to geopolitical tensions, this is not a strong enough catalyst to act on a technically baseless signal, especially given the market's recent record-setting performance and prevailing long sentiment.",
-  "conflicts_with_technical": true,
-  "generated_at": "2026-04-27T09:27:36.700819+00:00",
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 27303.67,
+  "stop_loss": 27600.0,
+  "take_profit": 26900.0,
+  "risk_pct": 1.5,
+  "rationale": "The NASDAQ 100 is in a strong uptrend, reaching record highs recently, but its RSI is deeply in overbought territory (74.8), signaling a potential near-term pullback. This technical warning is reinforced by recent news indicating falling futures due to geopolitical tensions and profit-taking after the significant rally, warranting a short position to capitalize on a short-term correction.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-27T10:25:54.196253+00:00",
   "model": "gemini-2.5-flash"
 }

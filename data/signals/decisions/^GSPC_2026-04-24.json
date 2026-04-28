@@ -3,8 +3,13 @@
   "signal_date": "2026-04-24",
   "signal": 0,
   "llm_recommendation": "NO_GO",
-  "rationale": "The technical signal for a SHORT is extremely weak, with zero supporting strategies and 0/100 confidence, making it unreliable. Despite an overbought RSI, the price is significantly above its fast SMA, indicating strong upward momentum. Market news is overwhelmingly bullish, highlighting record highs driven by AI optimism and strong chip stock performance, directly contradicting a short position. Acting on such a weak, unsupported signal against a robustly bullish market sentiment is unwarranted.",
-  "conflicts_with_technical": true,
-  "generated_at": "2026-04-27T09:26:59.556495+00:00",
+  "direction": null,
+  "entry_level": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "risk_pct": null,
+  "rationale": "The S&P 500 is in a strong uptrend, trading at record highs and significantly above its SMAs, fueled by bullish AI sentiment. However, the RSI is indicating overbought conditions (70.1), and crucially, all independent technical strategies are neutral, offering no clear entry signal. Furthermore, reports of hedge funds reducing risk despite the rally suggest institutional caution, making this a poor time to initiate a new discretionary spread bet.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-27T10:25:27.609785+00:00",
   "model": "gemini-2.5-flash"
 }

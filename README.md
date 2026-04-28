@@ -1,8 +1,8 @@
 # Trading Lab
 
-A Python-based trading signal dashboard and backtesting framework for commodity futures. Ingests daily OHLCV data via yfinance, generates SMA crossover signals with an RSI filter, validates strategies through in-sample/out-of-sample backtesting, and presents signals with optional LLM explanations in a Streamlit dashboard. Designed for paper trading research; Phase 2 targets IG Demo account execution.
+A Python-based trading signal dashboard, LLM decision engine, and execution pipeline for commodities and indices. Ingests daily OHLCV data via yfinance, runs 6 technical strategies with consensus voting, enriches signals with news articles and IG client sentiment, then hands everything to an LLM that acts as the primary decision maker — outputting GO/NO_GO/UNCERTAIN with full trade parameters. Signals and LLM analysis are presented in a Streamlit dashboard, and approved trades can be executed as spreadbets on IG.
 
-Tracked instruments: GC=F (Gold), CL=F (Crude Oil), SI=F (Silver), HG=F (Copper), NG=F (Natural Gas).
+Tracked instruments (11): Gold, Crude Oil (WTI), Silver, Copper, Natural Gas, FTSE 100, S&P 500, NASDAQ 100, DAX 40, Nikkei 225, Dow Jones.
 
 ---
 
@@ -22,39 +22,46 @@ Tracked instruments: GC=F (Gold), CL=F (Crude Oil), SI=F (Silver), HG=F (Copper)
 
 ## Overview
 
-- **5 instruments**: Gold (GC=F), Crude Oil (CL=F), Silver (SI=F), Copper (HG=F), Natural Gas (NG=F)
-- **Strategy**: SMA crossover (20/50) with RSI filter and ATR-based stop/take-profit levels
-- **Backtesting**: In-sample / out-of-sample split with overfitting detection and performance degradation scoring
-- **LLM layer**: Optional signal explanations and go/no-go decisions via Anthropic Claude; falls back to a stub if no API key is present
-- **Market context**: Session status awareness, economic calendar integration
-- **Dashboard**: 4-page Streamlit app — live signals, charts, backtests, settings
+- **11 instruments**: 5 commodities (Gold, Crude Oil, Silver, Copper, Natural Gas) + 6 indices (FTSE 100, S&P 500, NASDAQ 100, DAX 40, Nikkei 225, Dow Jones)
+- **6 strategies**: SMA crossover, MACD crossover, Bollinger Band breakout, Bollinger Band reversion, Donchian Channel, RSI mean reversion
+- **Multi-strategy consensus**: all 6 strategies vote per instrument; a >50% majority determines the primary signal direction
+- **LLM decision engine**: the LLM is the primary decision maker — it receives technical signals (per-strategy votes), news articles (with full body text), and IG client sentiment as evidence, then outputs GO/NO_GO/UNCERTAIN with direction (LONG/SHORT), entry level, stop loss, take profit, and risk percentage
+- **LLM providers**: Gemini (default), Claude, OpenAI, DeepSeek, or stub fallback
+- **News**: fetched from yfinance with full article body text via httpx + BeautifulSoup
+- **IG client sentiment**: fetched from the IG live API as a contrarian/confirmation signal
+- **Execution**: spreadbet order placement on IG via REST API (demo account for testing, live for real trading)
+- **Dashboard**: Streamlit app showing signals, LLM analysis, IG sentiment, news, charts, and backtests
 
 ---
 
 ## Architecture
 
 ```
-yfinance
+yfinance (OHLCV) + yfinance (news) + IG API (sentiment)
    |
    v
 scripts/ingest_market_data.py  -->  data/curated/  (Parquet OHLCV)
                                           |
                                           v
-scripts/run_signals.py         -->  data/signals/  (signal JSON + LLM cache)
+scripts/run_signals.py --multi -->  data/signals/  (snapshot + news/explanation/decision cache)
                                           |
                                           v
-                                  streamlit run app/main.py
+                                  streamlit run app/main.py  (dashboard)
+                                          |
+                                          v
+scripts/execute_trades.py       -->  IG REST API  (spreadbet orders)
 ```
 
 Core library (`src/trading_lab/`) is split into focused sub-packages:
 
 | Package | Responsibility |
 |---------|---------------|
-| `data/` | yfinance ingest, OHLCV transforms, schema validation |
-| `indicators/` | SMA, RSI, MACD, ATR |
-| `strategies/` | Strategy loader + SMA crossover implementation |
-| `backtesting/` | Engine (no-lookahead), metrics, IS/OOS validation |
-| `llm/` | LLM client ABC, Claude client, stub client, prompts, explainer, decision service |
+| `data/` | yfinance ingest, OHLCV transforms, news fetcher (headlines + article bodies), IG sentiment fetcher |
+| `features/` | Technical indicators (SMA, RSI, MACD, ATR, Bollinger, Donchian) |
+| `strategies/` | Strategy base class, loader, and 6 strategy implementations |
+| `backtesting/` | Engine (no-lookahead), metrics, IS/OOS validation, reporter |
+| `llm/` | LLM client ABC, Gemini/Claude/OpenAI/DeepSeek clients, stub client, prompts, explainer, decision service, factory |
+| `execution/` | Broker base class, IG REST API adapter (order placement, sentiment, positions) |
 | `context/` | Session checker, economic calendar fetcher, MarketContext aggregator |
 | `config/` | YAML loaders for instruments and environments |
 
@@ -62,10 +69,11 @@ Core library (`src/trading_lab/`) is split into focused sub-packages:
 
 ## Prerequisites
 
-- Python 3.12 or higher (developed on 3.14.3)
+- Python 3.11+ (developed on 3.14.3)
 - On Windows: use WSL2. The project lives at `/mnt/c/Dev/trading-lab` inside WSL.
-- `ANTHROPIC_API_KEY` — **optional**. Enables LLM signal explanations. Without it the app uses a stub that returns placeholder text.
-- Phase 2 only: IG credentials (`IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`) for IG Demo paper trading.
+- `GOOGLE_API_KEY` for Gemini LLM (default provider) — or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` for alternatives. Without any key the app falls back to a stub client that returns placeholder text.
+- IG Live credentials for sentiment data fetching (optional but recommended)
+- IG Demo credentials for trade execution
 
 ---
 
@@ -78,12 +86,10 @@ cd trading-lab
 python -m venv .venv
 source .venv/bin/activate        # Windows WSL2: same command
 
-pip install -e ".[dev]"
+pip install -e .
 
 cp .env.example .env             # then edit .env with your credentials
 ```
-
-The `pip install -e ".[dev]"` installs the `trading_lab` package in editable mode plus all dev dependencies (pytest, ruff, mypy, etc.).
 
 ---
 
@@ -91,42 +97,44 @@ The `pip install -e ".[dev]"` installs the `trading_lab` package in editable mod
 
 ### `config/instruments.yaml`
 
-Defines the 5 tracked instruments. Each entry specifies:
-- `symbol` — yfinance ticker
+Defines 11 tracked instruments. Each entry specifies:
+- `symbol` — yfinance ticker (e.g. `GC=F`, `^FTSE`)
 - `name` — human-readable label
-- `asset_class` — e.g. `commodity`
-- `currency` — e.g. `USD`
-- `session` — market open/close times (UTC) used for the session badge in the dashboard
-- `pip_value` — used in position size calculations
+- `asset_class` — `commodity` or `index`
+- `session_timezone`, `session_open`, `session_close` — market hours
+- `ig_epic` — IG instrument epic for spreadbet order placement (DFB = undated Daily Funded Bet)
+- `ig_sentiment_id` — IG market identifier for client sentiment lookup
 
 To add an instrument, append a new entry following the same schema and re-run the ingest script.
+
+### `config/strategies/`
+
+Six strategy YAML configs:
+- `sma_cross.yaml` — SMA crossover (primary strategy for stop/target levels)
+- `macd_cross.yaml` — MACD crossover
+- `bollinger_breakout.yaml` — Bollinger Band breakout
+- `bollinger_reversion.yaml` — Bollinger Band reversion
+- `donchian.yaml` — Donchian Channel
+- `rsi_reversion.yaml` — RSI mean reversion
 
 ### `config/environments/local.yaml`
 
 Runtime settings for local use:
 
 ```yaml
-llm:
-  provider: claude
-  model: claude-opus-4-6
+environment: demo       # demo | live — controls IG adapter endpoint
 
-trading:
-  capital: 100000        # GBP
+capital:
+  initial_cash: 100000
   risk_per_trade_pct: 1.0
-```
+  max_open_positions: 3
+  daily_loss_limit_pct: 3.0
 
-### `config/strategies/sma_cross.yaml`
-
-Strategy parameters:
-
-```yaml
-fast_window: 20
-slow_window: 50
-rsi_period: 14
-rsi_overbought: 70
-rsi_oversold: 30
-commission_bps: 5
-slippage_bps: 2
+llm:
+  provider: gemini
+  model: gemini-2.5-flash
+  max_tokens: 8192
+  enabled: true
 ```
 
 ### `.env`
@@ -134,11 +142,23 @@ slippage_bps: 2
 Secrets — **never commit this file**:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...      # optional — LLM explanations
-IG_API_KEY=...                    # Phase 2: IG Demo account
+# LLM Provider (at least one required for analysis)
+GOOGLE_API_KEY=...              # Gemini (default)
+ANTHROPIC_API_KEY=...           # Claude (alternative)
+OPENAI_API_KEY=...              # OpenAI (alternative)
+
+# IG Live (market data: sentiment)
+IG_LIVE_API_KEY=...
+IG_LIVE_USERNAME=...
+IG_LIVE_PASSWORD=...
+IG_LIVE_ACCOUNT_ID=...
+
+# IG Demo (trade execution)
+IG_API_KEY=...
 IG_USERNAME=...
 IG_PASSWORD=...
 IG_ACCOUNT_ID=...
+IG_DEMO=true
 ```
 
 ---
@@ -149,36 +169,40 @@ IG_ACCOUNT_ID=...
 
 ```bash
 python scripts/ingest_market_data.py
+python scripts/ingest_market_data.py --period 1y          # custom lookback
+python scripts/ingest_market_data.py --symbol GC=F        # single instrument
 ```
 
 Downloads daily OHLCV bars for all configured instruments via yfinance and writes Parquet files to `data/curated/`. Each file is named `<symbol_lower>_1d_yfinance.parquet`.
 
-Run this once to get started, then daily before generating signals. You can schedule it with cron:
-
-```cron
-0 22 * * 1-5  /path/to/.venv/bin/python /mnt/c/Dev/trading-lab/scripts/ingest_market_data.py
-```
+Run this once to get started, then daily before generating signals.
 
 ### Step 2 — Generate signals
 
 ```bash
-python scripts/run_signals.py
+python scripts/run_signals.py --multi
+python scripts/run_signals.py --symbol GC=F               # single instrument
+python scripts/run_signals.py --strategy config/strategies/sma_cross.yaml  # single strategy mode
 ```
 
-Loads curated data for each instrument, applies the configured strategy, and writes JSON signal files to `data/signals/`. Each file contains:
+The `--multi` flag (also the default when `--strategy` is not specified) runs all 6 strategies from `config/strategies/` with consensus voting. For each instrument:
 
-- `signal` — `1` (Buy), `-1` (Sell), or `0` (Neutral)
-- `confidence` — score between 0 and 1
-- `stop_price` and `tp_price` — ATR-based levels
-- `timestamp` — when the signal was generated
+1. Every strategy generates signals independently
+2. A >50% majority vote determines the consensus direction (LONG/SHORT/FLAT)
+3. Stop/target levels come from the primary strategy (sma_cross)
+4. News articles are fetched from yfinance (with full body text via httpx + BeautifulSoup)
+5. IG client sentiment is fetched from the live API
+6. The LLM receives all evidence and outputs a structured decision: GO/NO_GO/UNCERTAIN with direction, entry level, stop loss, take profit, and risk percentage
 
-### Step 3 — Sanity check (optional but recommended after first setup)
+Output: `data/signals/portfolio_snapshot.parquet` plus cached news, explanations, and decisions per instrument per date.
+
+### Step 3 — Sanity check (optional)
 
 ```bash
 python scripts/sanity_check.py
 ```
 
-Validates that data files are present and fresh, signals exist for all instruments, and key invariants hold (no future leakage, correct column types). Useful after first setup or when debugging unexpected dashboard behaviour.
+Validates that data files are present and fresh, signals exist for all instruments, and key invariants hold.
 
 ### Step 4 — Launch the dashboard
 
@@ -190,14 +214,12 @@ Opens at `http://localhost:8501`. Four pages:
 
 #### Dashboard
 
-The main signals overview. For each instrument you see:
+The main signals overview. Summary bar shows Buy/Sell/Neutral counts based on LLM decisions. For each instrument you see:
 
-- Current signal (Buy / Sell / Neutral) with a confidence badge
-- Session status badge (Open / Closed) based on current UTC time
-- LLM explanation of the signal (requires `ANTHROPIC_API_KEY`; shows stub text otherwise)
-- LLM go/no-go recommendation (GO / NO\_GO / UNCERTAIN) with rationale
-- Position sizing calculator — enter your account capital and the ATR stop distance to get recommended units and GBP risk
-- Correlation warnings — if two or more instruments have the same directional signal and their 60-bar price correlation exceeds 0.7, a warning is shown above the table
+- Current price, indicators, stop/target levels, confidence, signal age
+- IG Client Sentiment bar (where available from the live API)
+- LLM Analysis panel: news articles, signal explanation, decision (GO/NO_GO/UNCERTAIN with direction and order parameters)
+- Instruments sorted by LLM decision (GO first)
 
 #### Charts
 
@@ -207,27 +229,32 @@ Interactive candlestick chart with SMA overlays (fast and slow) and an RSI panel
 
 Two tabs:
 
-**Strategy Validation** — run an in-sample backtest first to lock parameters, then an out-of-sample backtest to check real-world performance. The page shows:
-- Approval badge: APPROVED FOR PAPER TRADING / NOT APPROVED with reason
-- Performance degradation percentage (IS Sharpe vs OOS Sharpe)
-- Overfitting warning if degradation exceeds 50%
-- Equity curve with green IS region and orange OOS region shaded
+**Strategy Validation** — run an in-sample backtest first to lock parameters, then an out-of-sample backtest to check real-world performance. Shows approval badge, performance degradation percentage, overfitting warning, and equity curve.
 
-**Compare Instruments** — run the same strategy across multiple instruments simultaneously. Results are ranked by Sharpe ratio and the best performer is highlighted. Each instrument's equity curve is available in an expandable panel.
+**Compare Instruments** — run the same strategy across multiple instruments simultaneously, ranked by Sharpe ratio.
 
 #### Settings
 
 View the current instrument and strategy configuration.
 
+### Step 5 — Execute trades
+
+```bash
+python scripts/execute_trades.py                          # dry run — prints actions only
+python scripts/execute_trades.py --execute                # live — places orders on IG
+python scripts/execute_trades.py --symbol GC=F            # single instrument, dry run
+python scripts/execute_trades.py --symbol GC=F --execute  # single instrument, live
+```
+
+Reads the portfolio snapshot and LLM decision cache, then places spreadbet orders on IG for every instrument where the LLM said GO. Position size is calculated from the LLM's risk percentage and stop distance. Includes a staleness guard — refuses to trade if the snapshot is more than 2 calendar days old.
+
 ### Typical daily workflow
 
-1. Run `ingest_market_data.py` (or let the cron job handle it after market close)
-2. Run `run_signals.py`
-3. Open the dashboard at `http://localhost:8501`
-4. Check the Dashboard page for today's signals and any correlation warnings
-5. For any signal you plan to act on, read the LLM explanation and go/no-go recommendation
-6. Use the position sizing calculator to determine trade size (enter your account capital and the ATR stop distance shown for the instrument)
-7. Before entering, confirm no correlation warning exists with another open position
+1. Run `python scripts/ingest_market_data.py` (or schedule via cron after market close)
+2. Run `python scripts/run_signals.py --multi`
+3. Open the dashboard at `http://localhost:8501`, review LLM decisions
+4. Run `python scripts/execute_trades.py` (dry run first to review)
+5. If satisfied, run `python scripts/execute_trades.py --execute` to place orders
 
 ### Data exploration notebook
 
@@ -235,18 +262,7 @@ View the current instrument and strategy configuration.
 jupyter lab notebooks/02_data_exploration.ipynb
 ```
 
-The notebook covers the full pipeline interactively:
-
-1. Raw data inspection and cleaning
-2. Indicator calculation (SMA, RSI, MACD, ATR)
-3. Strategy signal generation
-4. IS/OOS backtesting with metrics
-5. Performance degradation analysis
-6. News headlines via yfinance
-7. LLM signal explanation
-8. LLM go/no-go decision
-
-Useful for parameter research and understanding how signals are constructed before using the dashboard.
+Interactive walkthrough of the full pipeline: data inspection, indicator calculation, strategy signals, backtesting, news headlines, LLM explanation, and LLM decision.
 
 ---
 
@@ -257,67 +273,101 @@ trading-lab/
 ├── app/
 │   ├── main.py                        # Streamlit entry point (4 pages)
 │   └── pages/
-│       ├── dashboard.py               # Live signals, session, LLM, position sizing
+│       ├── dashboard.py               # Signals, LLM analysis, IG sentiment, news
 │       ├── charts.py                  # Candlestick + indicator charts
 │       ├── backtests.py               # IS/OOS validation + instrument comparison
-│       └── settings.py               # Config viewer
+│       └── settings.py                # Config viewer
 ├── config/
-│   ├── instruments.yaml               # 5 commodity futures
+│   ├── instruments.yaml               # 11 instruments (5 commodities + 6 indices)
 │   ├── environments/
-│   │   └── local.yaml                 # LLM model, capital, risk %
+│   │   └── local.yaml                 # LLM model, capital, risk %, IG environment
 │   └── strategies/
-│       └── sma_cross.yaml             # SMA/RSI/ATR parameters
+│       ├── sma_cross.yaml             # SMA crossover (primary)
+│       ├── macd_cross.yaml            # MACD crossover
+│       ├── bollinger_breakout.yaml    # Bollinger Band breakout
+│       ├── bollinger_reversion.yaml   # Bollinger Band reversion
+│       ├── donchian.yaml              # Donchian Channel
+│       └── rsi_reversion.yaml         # RSI mean reversion
 ├── data/                              # generated, gitignored
 │   ├── curated/                       # Parquet OHLCV files
-│   └── signals/                       # signal JSON + LLM explanation/decision cache
+│   └── signals/                       # snapshot + news/explanation/decision cache
+│       ├── portfolio_snapshot.parquet
+│       ├── explanations/              # LLM explanation JSON per instrument per date
+│       ├── decisions/                 # LLM decision JSON per instrument per date
+│       └── news/                      # News articles JSON per instrument per date
 ├── notebooks/
-│   ├── 01_strategy_dev.ipynb
+│   ├── 01_data_check.ipynb
 │   └── 02_data_exploration.ipynb
 ├── scripts/
 │   ├── ingest_market_data.py          # Download + write curated Parquet
-│   ├── run_signals.py                 # Generate signal JSON files
-│   └── sanity_check.py               # Validate data freshness and invariants
+│   ├── run_signals.py                 # Multi-strategy consensus + LLM decisions
+│   ├── sanity_check.py                # Validate data freshness and invariants
+│   └── execute_trades.py             # Dry-run / live spreadbet order placement
 ├── src/
 │   └── trading_lab/
 │       ├── backtesting/
 │       │   ├── engine.py              # No-lookahead backtest engine
 │       │   ├── metrics.py             # Sharpe, CAGR, drawdown, win rate
 │       │   ├── models.py              # BacktestConfig, BacktestResult
-│       │   └── validation.py         # IS/OOS split, threshold checks, degradation
+│       │   ├── reporter.py            # Backtest report formatting
+│       │   └── validation.py          # IS/OOS split, threshold checks, degradation
 │       ├── config/
-│       │   └── loader.py             # YAML instrument and environment loaders
+│       │   └── loader.py              # YAML instrument and environment loaders
 │       ├── context/
-│       │   ├── calendar_fetcher.py   # Economic calendar with daily cache
-│       │   ├── market_context.py     # MarketContext aggregator, persist/load
-│       │   └── session_checker.py   # is_session_open() with overnight support
+│       │   ├── calendar_fetcher.py    # Economic calendar with daily cache
+│       │   ├── market_context.py      # MarketContext aggregator, persist/load
+│       │   └── session_checker.py     # is_session_open() with overnight support
 │       ├── data/
-│       │   ├── schema.py             # OHLCV column validation
-│       │   ├── transforms.py         # Dedup, sort, resample helpers
-│       │   └── yfinance_ingest.py   # fetch_ohlcv(), fetch_news()
-│       ├── indicators/
-│       │   └── technical.py          # sma, rsi, macd, atr, sma_gap_pct
+│       │   ├── models.py              # MarketDataRequest dataclass
+│       │   ├── transforms.py          # Dedup, sort, resample helpers
+│       │   ├── yfinance_ingest.py     # fetch_ohlcv(), fetch_news()
+│       │   ├── news_fetcher.py        # yfinance news + httpx article body scraping
+│       │   └── ig_sentiment_fetcher.py # IG client sentiment via live API
+│       ├── execution/
+│       │   ├── broker_base.py         # BrokerAdapter ABC, OrderRequest dataclass
+│       │   └── ig.py                  # IgBrokerAdapter (auth, orders, sentiment, positions)
+│       ├── features/
+│       │   └── indicators.py          # SMA, RSI, MACD, ATR, Bollinger, Donchian
 │       ├── llm/
-│       │   ├── base.py               # LLMClient ABC
-│       │   ├── claude_client.py      # ClaudeClient (Anthropic SDK)
-│       │   ├── stub_client.py        # StubLLMClient (no API key needed)
-│       │   ├── context.py            # SignalContext dataclass + builder
-│       │   ├── prompts.py            # Prompt templates + builders
-│       │   ├── explainer.py          # ExplanationService (cache-first)
-│       │   └── decision.py           # DecisionService (cache-first, JSON parse)
+│       │   ├── base.py                # LLMClient ABC
+│       │   ├── gemini_client.py       # GeminiClient (google-genai SDK)
+│       │   ├── claude_client.py       # ClaudeClient (Anthropic SDK)
+│       │   ├── openai_client.py       # OpenAIClient (OpenAI SDK)
+│       │   ├── deepseek_client.py     # DeepSeekClient
+│       │   ├── stub_client.py         # StubLLMClient (no API key needed)
+│       │   ├── factory.py             # Provider factory (gemini/claude/openai/deepseek/stub)
+│       │   ├── context.py             # SignalContext dataclass + builder
+│       │   ├── prompts.py             # Prompt templates + builders
+│       │   ├── explainer.py           # ExplanationService (cache-first)
+│       │   └── decision.py            # DecisionService (cache-first), LLMDecision dataclass
 │       ├── strategies/
-│       │   ├── loader.py             # Load strategy from YAML
-│       │   └── sma_cross.py         # SMAcrossStrategy
-│       ├── exceptions.py             # LLMError, ConfigurationError, etc.
-│       └── paths.py                  # Centralised path constants
+│       │   ├── base.py                # Strategy ABC
+│       │   ├── loader.py              # Load strategy from YAML
+│       │   ├── quality.py             # Signal quality scoring
+│       │   ├── sma_cross.py           # SMA crossover strategy
+│       │   ├── macd_cross.py          # MACD crossover strategy
+│       │   ├── bollinger.py           # Bollinger Band breakout + reversion
+│       │   ├── donchian.py            # Donchian Channel strategy
+│       │   └── rsi_reversion.py       # RSI mean reversion strategy
+│       ├── audit.py                   # Audit event logging
+│       ├── exceptions.py              # LLMError, ConfigurationError, etc.
+│       ├── logging_config.py          # Structured logging setup
+│       └── paths.py                   # Centralised path constants
 └── tests/
-    ├── test_indicators.py
-    ├── test_strategy.py
-    ├── test_engine.py
-    ├── test_metrics.py
-    ├── test_validation.py
-    ├── test_llm.py
+    ├── conftest.py
+    ├── test_audit.py
+    ├── test_charts_logic.py
+    ├── test_config_loader.py
     ├── test_context.py
-    └── test_dashboard_logic.py
+    ├── test_dashboard_logic.py
+    ├── test_engine.py
+    ├── test_indicators.py
+    ├── test_llm.py
+    ├── test_loader.py
+    ├── test_metrics.py
+    ├── test_strategy.py
+    ├── test_transforms.py
+    └── test_validation.py
 ```
 
 ---
@@ -327,17 +377,14 @@ trading-lab/
 ### Running tests
 
 ```bash
-# All tests
+# All tests with coverage (80% minimum gate)
 pytest
-
-# With coverage gate (80% minimum)
-pytest --cov=src/trading_lab --cov-fail-under=80
 
 # Single file, verbose
 pytest tests/test_strategy.py -v
 
 # Fast smoke run (no coverage)
-pytest -x -q
+pytest -x -q --no-cov
 ```
 
 ### Adding a new strategy
@@ -352,14 +399,13 @@ pytest -x -q
        ...
    ```
 3. Register the class in `src/trading_lab/strategies/loader.py`
-4. The Backtests page automatically picks up any new `*.yaml` file in `config/strategies/`
+4. The strategy will automatically be picked up by `run_signals.py --multi` and the Backtests page
 
 ### Code quality
 
 ```bash
 ruff check .          # linting
 ruff format .         # formatting
-mypy src/             # type checking
 ```
 
 ---
@@ -368,18 +414,20 @@ mypy src/             # type checking
 
 ### Phase 1 — Signal Dashboard (complete)
 
-- Daily data ingestion via yfinance for 5 commodity futures
-- SMA crossover strategy with RSI filter and ATR-based stops
+- Daily data ingestion via yfinance for 11 instruments (5 commodities + 6 indices)
+- 6 technical strategies with multi-strategy consensus voting
 - Backtesting engine with no-lookahead enforcement
 - IS/OOS validation with overfitting detection and degradation scoring
-- LLM signal explanations and go/no-go decisions (Claude or stub fallback)
-- Market context: session status, economic calendar
 - Streamlit dashboard: live signals, charts, IS/OOS backtests, instrument comparison
-- Correlation warnings for co-directional positions
-- Position sizing calculator
 
-### Phase 2 — IG Demo Paper Trading (in progress)
+### Phase 2 — LLM Decision Engine + Trade Execution (complete)
 
-- Automated order placement via IG REST API against an IG Demo account
-- Trade journal with P&L tracking
-- Risk management rules (daily loss limit, max open positions)
+- LLM as primary decision maker with structured GO/NO_GO/UNCERTAIN output
+- 5 LLM providers supported: Gemini (default), Claude, OpenAI, DeepSeek, stub fallback
+- News integration: yfinance headlines with full article body text (httpx + BeautifulSoup)
+- IG client sentiment fetched from live API as contrarian/confirmation signal
+- Signal explanations and decisions cached per instrument per date
+- Spreadbet order execution pipeline on IG via REST API (dry-run and live modes)
+- Position sizing from LLM risk percentage and stop distance
+
+Note: spreadbet execution requires IG DFB (Daily Funded Bet) instruments. Demo accounts may only support CFD instruments for some markets.

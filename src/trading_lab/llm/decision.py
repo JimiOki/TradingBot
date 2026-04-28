@@ -33,6 +33,10 @@ class LLMDecision:
     signal: int
     llm_recommendation: str      # "GO", "NO_GO", or "UNCERTAIN"
     direction: str | None        # "LONG", "SHORT", or None
+    entry_level: float | None    # spread-bet entry price
+    stop_loss: float | None      # stop loss level
+    take_profit: float | None    # take profit target
+    risk_pct: float | None       # risk % of capital (0.5-3.0)
     rationale: str               # 1-3 sentences
     conflicts_with_technical: bool
     generated_at: datetime
@@ -66,6 +70,10 @@ class DecisionService:
                     signal=data["signal"],
                     llm_recommendation=data["llm_recommendation"],
                     direction=data.get("direction"),
+                    entry_level=data.get("entry_level"),
+                    stop_loss=data.get("stop_loss"),
+                    take_profit=data.get("take_profit"),
+                    risk_pct=data.get("risk_pct"),
                     rationale=data["rationale"],
                     conflicts_with_technical=data["conflicts_with_technical"],
                     generated_at=datetime.fromisoformat(data["generated_at"]),
@@ -93,6 +101,10 @@ class DecisionService:
                 signal=context.signal,
                 llm_recommendation="UNCERTAIN",
                 direction=None,
+                entry_level=None,
+                stop_loss=None,
+                take_profit=None,
+                risk_pct=None,
                 rationale=DECISION_UNAVAILABLE,
                 conflicts_with_technical=False,
                 generated_at=datetime.now(timezone.utc),
@@ -107,6 +119,10 @@ class DecisionService:
             signal=context.signal,
             llm_recommendation=decision["recommendation"],
             direction=decision.get("direction"),
+            entry_level=decision.get("entry_level"),
+            stop_loss=decision.get("stop_loss"),
+            take_profit=decision.get("take_profit"),
+            risk_pct=decision.get("risk_pct"),
             rationale=decision["rationale"],
             conflicts_with_technical=bool(decision.get("conflicts_with_technical", False)),
             generated_at=generated_at,
@@ -123,6 +139,10 @@ class DecisionService:
                 "signal": result.signal,
                 "llm_recommendation": result.llm_recommendation,
                 "direction": result.direction,
+                "entry_level": result.entry_level,
+                "stop_loss": result.stop_loss,
+                "take_profit": result.take_profit,
+                "risk_pct": result.risk_pct,
                 "rationale": result.rationale,
                 "conflicts_with_technical": result.conflicts_with_technical,
                 "generated_at": result.generated_at.isoformat(),
@@ -169,9 +189,47 @@ class DecisionService:
         if recommendation != "GO":
             raw_direction = None
 
+        # Parse order parameters
+        entry_level = data.get("entry_level")
+        stop_loss = data.get("stop_loss")
+        take_profit = data.get("take_profit")
+        risk_pct = data.get("risk_pct")
+
+        if recommendation == "GO":
+            # Validate and coerce to float
+            try:
+                entry_level = float(entry_level) if entry_level is not None else None
+            except (TypeError, ValueError):
+                entry_level = None
+            try:
+                stop_loss = float(stop_loss) if stop_loss is not None else None
+            except (TypeError, ValueError):
+                stop_loss = None
+            try:
+                take_profit = float(take_profit) if take_profit is not None else None
+            except (TypeError, ValueError):
+                take_profit = None
+            try:
+                risk_pct = float(risk_pct) if risk_pct is not None else None
+            except (TypeError, ValueError):
+                risk_pct = None
+            # Clamp risk_pct to valid range
+            if risk_pct is not None and not (0.1 <= risk_pct <= 5.0):
+                risk_pct = max(0.1, min(5.0, risk_pct))
+        else:
+            # Non-GO: all order params must be None
+            entry_level = None
+            stop_loss = None
+            take_profit = None
+            risk_pct = None
+
         return {
             "recommendation": recommendation,
             "direction": raw_direction,
+            "entry_level": entry_level,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "risk_pct": risk_pct,
             "rationale": str(data.get("rationale", DECISION_UNAVAILABLE)),
             "conflicts_with_technical": bool(data.get("conflicts_with_technical", False)),
         }

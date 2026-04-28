@@ -3,8 +3,13 @@
   "signal_date": "2026-04-27",
   "signal": 0,
   "llm_recommendation": "UNCERTAIN",
-  "rationale": "The technical signal indicates SHORT with 75% confidence, with the Close below both SMAs. However, only 1 out of 6 independent strategies confirms this direction, making the technical conviction weak. The news is highly conflicting: one report suggests gold is slipping due to inflation and higher rates (supporting SHORT), while others highlight a 'solid entry point' for gold after a selloff and expect a bounce (opposing SHORT). This strong contradiction in fundamental drivers, combined with weak technical consensus, leads to insufficient conviction for a decisive trade.",
-  "conflicts_with_technical": true,
-  "generated_at": "2026-04-27T09:23:38.202559+00:00",
+  "direction": null,
+  "entry_level": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "risk_pct": null,
+  "rationale": "The technical picture shows a weak short bias (1 of 6 strategies) despite bearish price action below SMAs and RSI below 50. News headlines present conflicting fundamental drivers, with some indicating bearish pressures from inflation and higher rates, while others highlight analyst optimism and a 'solid entry point' for gold after a significant sell-off. The conflicting signals from both technicals and news make a high-conviction trade difficult.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-27T10:23:22.877523+00:00",
   "model": "gemini-2.5-flash"
 }

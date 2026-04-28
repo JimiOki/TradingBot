@@ -2,9 +2,14 @@
   "symbol": "^DJI",
   "signal_date": "2026-04-24",
   "signal": 0,
-  "llm_recommendation": "NO_GO",
-  "rationale": "The technical signal for a SHORT position is significantly weakened by a very low strategy consensus, with only 1 of 6 independent strategies agreeing. Furthermore, recent news indicates the market is 'on edge' and 'reluctant to make any major moves' ahead of a critical week dominated by Big Tech earnings and a Federal Reserve interest-rate decision. Given the weak technical backing and the strong market anticipation for high-impact news events, it is prudent to stand aside.",
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 49230.71,
+  "stop_loss": 50167.69,
+  "take_profit": 47356.75,
+  "risk_pct": 2.0,
+  "rationale": "While technicals from 2026-04-24 showed an uptrend, the suggested stop/target pointed to a short setup. More recent news indicates specific weakness for the Dow, with futures sliding and market nervousness ahead of major earnings and a Fed meeting. This short-term bearish sentiment and catalysts override the earlier bullish technical momentum, leading to a conviction for a short trade.",
   "conflicts_with_technical": false,
-  "generated_at": "2026-04-27T09:29:24.317035+00:00",
+  "generated_at": "2026-04-27T10:27:04.508067+00:00",
   "model": "gemini-2.5-flash"
 }

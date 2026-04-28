@@ -92,15 +92,36 @@ def is_data_stale(timestamp, threshold_hours: int = STALE_DATA_HOURS) -> bool:
 
 
 def compute_portfolio_summary(df: pd.DataFrame) -> dict:
-    """Count buy/sell/neutral/missing signals across the portfolio snapshot."""
+    """Count buy/sell/neutral/missing based on LLM decisions, not raw technical signals."""
     if df is None or df.empty:
         return {"buy": 0, "sell": 0, "neutral": 0, "missing": 0}
     missing = int((df["status"] == "data_missing").sum())
     active = df[df["status"] == "ok"]
+    buy = 0
+    sell = 0
+    neutral = 0
+    for _, row in active.iterrows():
+        symbol = row.get("symbol", "")
+        ts = row.get("timestamp_of_last_bar")
+        if ts is None:
+            neutral += 1
+            continue
+        signal_date = pd.Timestamp(ts).date()
+        decision = load_decision(symbol, str(signal_date))
+        if decision and decision.get("llm_recommendation") == "GO":
+            direction = decision.get("direction", "")
+            if direction == "LONG":
+                buy += 1
+            elif direction == "SHORT":
+                sell += 1
+            else:
+                neutral += 1
+        else:
+            neutral += 1
     return {
-        "buy": int((active["signal"] == 1).sum()),
-        "sell": int((active["signal"] == -1).sum()),
-        "neutral": int((active["signal"] == 0).sum()),
+        "buy": buy,
+        "sell": sell,
+        "neutral": neutral,
         "missing": missing,
     }
 
@@ -347,7 +368,22 @@ def _render_signal_table(df: pd.DataFrame) -> None:
         symbol = row["symbol"]
         name = row.get("name", symbol)
         status = row.get("status", "ok")
-        label = get_signal_label(row.get("signal"))
+
+        # Use LLM decision as the primary label, fall back to technical signal
+        ts_for_label = row.get("timestamp_of_last_bar")
+        label_date_str = (
+            str(pd.Timestamp(ts_for_label).date())
+            if ts_for_label is not None
+            else datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        )
+        _dec = load_decision(symbol, label_date_str)
+        if _dec and _dec.get("llm_recommendation") == "GO":
+            _dir = _dec.get("direction", "")
+            label = "Buy" if _dir == "LONG" else "Sell" if _dir == "SHORT" else "Neutral"
+        elif status == "data_missing":
+            label = "Data Missing"
+        else:
+            label = "Neutral"
         colour = _signal_colour(label)
 
         # --- Signal age (REQ-CTX-003) ---
@@ -504,8 +540,23 @@ def _render_signal_table(df: pd.DataFrame) -> None:
                             st.caption(f"Technical consensus: **{tech_label.upper()}**")
                         if rationale:
                             st.markdown(rationale)
-                        if conflicts:
+                        # Only show conflict warning when technical consensus is directional
+                        tech_is_directional = row.get("signal") in (1, -1)
+                        if conflicts and tech_is_directional:
                             st.warning("LLM direction conflicts with the technical consensus.")
+
+                    # Order parameters for GO decisions
+                    if rec == "GO":
+                        d_entry = decision.get("entry_level")
+                        d_stop = decision.get("stop_loss")
+                        d_target = decision.get("take_profit")
+                        d_risk = decision.get("risk_pct")
+                        if d_entry is not None or d_stop is not None or d_target is not None:
+                            oc1, oc2, oc3, oc4 = st.columns(4)
+                            oc1.metric("Entry", _fmt_price(d_entry))
+                            oc2.metric("Stop Loss", _fmt_price(d_stop))
+                            oc3.metric("Target", _fmt_price(d_target))
+                            oc4.metric("Risk %", f"{d_risk:.1f}%" if d_risk is not None else "—")
                 elif is_flat:
                     st.caption("_No directional signal — LLM analysis only runs for Buy/Sell signals._")
                 else:
@@ -574,12 +625,21 @@ def main() -> None:
 
     st.subheader(f"Signals — {len(df)} instrument(s)")
 
-    # Sort: Sell/Buy first, then neutral, then missing
-    order = {"Sell": 0, "Buy": 1, "Neutral": 2, "Data Missing": 3}
+    # Sort: GO (Sell/Buy) first, then NO_GO/UNCERTAIN, then data missing
+    def _sort_key(row):
+        if row.get("status") == "data_missing":
+            return 3
+        symbol = row.get("symbol", "")
+        signal_date = row.get("signal_date", "")
+        if hasattr(signal_date, "date"):
+            signal_date = signal_date.date()
+        decision = load_decision(symbol, str(signal_date))
+        if decision and decision.get("llm_recommendation") == "GO":
+            return 0 if decision.get("direction") == "SHORT" else 1
+        return 2
+
     df = df.copy()
-    df["_sort"] = df["signal"].apply(
-        lambda s: order.get(get_signal_label(s), 3)
-    )
+    df["_sort"] = df.apply(_sort_key, axis=1)
     df = df.sort_values("_sort").drop(columns=["_sort"])
 
     _render_signal_table(df)
