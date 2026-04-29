@@ -71,7 +71,7 @@ IG_ACCOUNT_ID=your_account_id_here
 IG_ENVIRONMENT=demo
 
 # Anthropic Claude API (for signal explanations)
-ANTHROPIC_API_KEY=your_anthropic_key_here
+GOOGLE_API_KEY=your_key_here
 ```
 
 > `.env` is excluded from Git. Never commit it.
