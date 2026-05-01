@@ -10,6 +10,8 @@ class OrderRequest:
     epic: str = ""     # IG epic, e.g. "CS.D.CFDGOLD.CFD.IP"
     stop_distance: float = 0.0   # points from entry
     limit_distance: float = 0.0  # points from entry
+    order_type: str = "MARKET"   # "MARKET" or "LIMIT"
+    level: float | None = None   # required for LIMIT orders — the entry price
 
 
 class BrokerAdapter(ABC):

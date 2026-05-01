@@ -88,12 +88,23 @@ all of it, reach a conviction, and specify the trade parameters if acting.
 - Set risk_pct between 0.5 and 3.0 based on your conviction: low conviction = 0.5-1.0, \
   moderate = 1.0-2.0, high conviction = 2.0-3.0
 
+## Timing & regime awareness
+- If price is at or near all-time highs, extended far above SMAs, or RSI > 70, consider whether NOW \
+  is the right entry or whether a pullback would offer better risk/reward
+- In strong trends (price well above both SMAs, clear momentum), don't fight the trend with mean \
+  reversion shorts — RSI can stay "overbought" for weeks in trending markets
+- If you want to go with the trend but price is extended, set order_type to "LIMIT" and entry_level \
+  to a pullback level (e.g. near fast SMA or recent support)
+- If entry is attractive right now (price near support, consolidation, or fresh breakout with volume), \
+  use order_type "MARKET"
+
 Respond ONLY with a JSON object. No text outside the JSON.
 
 Required format:
 {{
   "recommendation": "GO" | "NO_GO" | "UNCERTAIN",
   "direction": "LONG" | "SHORT" | null,
+  "order_type": "MARKET" | "LIMIT",
   "entry_level": <float or null>,
   "stop_loss": <float or null>,
   "take_profit": <float or null>,
@@ -102,7 +113,9 @@ Required format:
   "conflicts_with_technical": true | false
 }}
 
-When recommendation is GO: direction, entry_level, stop_loss, take_profit, and risk_pct must all be set.
+When recommendation is GO: direction, order_type, entry_level, stop_loss, take_profit, and risk_pct must all be set.
+For MARKET orders, entry_level is the current close price (reference only).
+For LIMIT orders, entry_level is the desired pullback entry price — must be below close for LONG, above close for SHORT.
 When recommendation is NO_GO or UNCERTAIN: direction, entry_level, stop_loss, take_profit, and risk_pct must be null.
 conflicts_with_technical should be true ONLY when the technical consensus has a clear directional signal (majority of strategies agree on LONG or SHORT) and your direction opposes it. When the technical consensus is neutral/flat, set this to false — choosing a direction when technicals are inconclusive is not a conflict.
 """

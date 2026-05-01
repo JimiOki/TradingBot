@@ -589,6 +589,7 @@ def _render_signal_table(df: pd.DataFrame) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    st.set_page_config(layout="wide")
     st.title("Dashboard")
 
     # --- Snapshot load ---

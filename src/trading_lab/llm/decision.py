@@ -33,6 +33,7 @@ class LLMDecision:
     signal: int
     llm_recommendation: str      # "GO", "NO_GO", or "UNCERTAIN"
     direction: str | None        # "LONG", "SHORT", or None
+    order_type: str | None       # "MARKET", "LIMIT", or None (non-GO)
     entry_level: float | None    # spread-bet entry price
     stop_loss: float | None      # stop loss level
     take_profit: float | None    # take profit target
@@ -70,6 +71,7 @@ class DecisionService:
                     signal=data["signal"],
                     llm_recommendation=data["llm_recommendation"],
                     direction=data.get("direction"),
+                    order_type=data.get("order_type"),
                     entry_level=data.get("entry_level"),
                     stop_loss=data.get("stop_loss"),
                     take_profit=data.get("take_profit"),
@@ -101,6 +103,7 @@ class DecisionService:
                 signal=context.signal,
                 llm_recommendation="UNCERTAIN",
                 direction=None,
+                order_type=None,
                 entry_level=None,
                 stop_loss=None,
                 take_profit=None,
@@ -119,6 +122,7 @@ class DecisionService:
             signal=context.signal,
             llm_recommendation=decision["recommendation"],
             direction=decision.get("direction"),
+            order_type=decision.get("order_type"),
             entry_level=decision.get("entry_level"),
             stop_loss=decision.get("stop_loss"),
             take_profit=decision.get("take_profit"),
@@ -139,6 +143,7 @@ class DecisionService:
                 "signal": result.signal,
                 "llm_recommendation": result.llm_recommendation,
                 "direction": result.direction,
+                "order_type": result.order_type,
                 "entry_level": result.entry_level,
                 "stop_loss": result.stop_loss,
                 "take_profit": result.take_profit,
@@ -185,9 +190,19 @@ class DecisionService:
             raw_direction = str(raw_direction).upper()
             if raw_direction not in {"LONG", "SHORT"}:
                 raw_direction = None
-        # Enforce: direction must be null when recommendation is not GO
+        # Parse order_type
+        raw_order_type = data.get("order_type")
+        if raw_order_type is not None:
+            raw_order_type = str(raw_order_type).upper()
+
+        # Enforce: direction and order_type must be null when recommendation is not GO
         if recommendation != "GO":
             raw_direction = None
+            raw_order_type = None
+        else:
+            # Default to MARKET if missing or invalid for GO recommendations
+            if raw_order_type not in {"MARKET", "LIMIT"}:
+                raw_order_type = "MARKET"
 
         # Parse order parameters
         entry_level = data.get("entry_level")
@@ -226,6 +241,7 @@ class DecisionService:
         return {
             "recommendation": recommendation,
             "direction": raw_direction,
+            "order_type": raw_order_type,
             "entry_level": entry_level,
             "stop_loss": stop_loss,
             "take_profit": take_profit,

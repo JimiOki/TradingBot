@@ -369,8 +369,9 @@ class IgBrokerAdapter(BrokerAdapter):
         ig = self._session()
 
         logger.info(
-            "Placing IG order: epic=%s side=%s size=%s stop_dist=%s limit_dist=%s",
+            "Placing IG order: epic=%s side=%s size=%s stop_dist=%s limit_dist=%s order_type=%s level=%s",
             order.epic, order.side, order.size, order.stop_distance, order.limit_distance,
+            order.order_type, order.level,
         )
 
         # Build a clean request body — no null fields.  The trading_ig
@@ -383,11 +384,15 @@ class IgBrokerAdapter(BrokerAdapter):
             "expiry": "DFB",                  # Daily Funded Bet — required for spreadbets
             "forceOpen": True,
             "guaranteedStop": False,
-            "orderType": "MARKET",
+            "orderType": order.order_type,
             "size": order.size,
             "stopDistance": order.stop_distance,
             "limitDistance": order.limit_distance,
         }
+
+        if order.order_type == "LIMIT":
+            body["level"] = order.level
+            body["timeInForce"] = "GOOD_TILL_CANCELLED"
 
         # Use the library's authenticated session headers (OAuth Bearer token)
         # and POST directly to avoid the library injecting null fields.

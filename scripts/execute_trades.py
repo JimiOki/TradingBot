@@ -334,6 +334,8 @@ def process_instrument(
         return result
 
     result["direction"] = direction
+    order_type = decision.get("order_type", "MARKET")
+    result["order_type"] = order_type
     side = _llm_direction_to_ig(direction)
 
     # --- Position management: existing position + GO ---
@@ -418,7 +420,7 @@ def process_instrument(
     size = max(size, inst_min_size)
 
     logger.info(
-        "  %s %s — side=%s size=%.1f stop=%.4f target=%.4f risk=%.1f%% entry_ref=%s epic=%s",
+        "  %s %s — side=%s size=%.1f stop=%.4f target=%.4f risk=%.1f%% entry_ref=%s epic=%s order_type=%s",
         "WOULD PLACE" if dry_run else "PLACING",
         symbol,
         side,
@@ -428,19 +430,26 @@ def process_instrument(
         risk_pct,
         entry_level if entry_level is not None else "N/A",
         epic or "(no epic)",
+        order_type,
     )
 
     if dry_run:
         result["action"] = "DRY RUN: would place"
         result["note"] = (
             f"side={side} size={size} stop={llm_stop} target={llm_tp} "
-            f"risk={risk_pct}% entry_ref={entry_level} epic={epic or 'MISSING'}"
+            f"risk={risk_pct}% entry_ref={entry_level} epic={epic or 'MISSING'} "
+            f"order_type={order_type}"
         )
         return result
 
     # --- Place order (live) with retry-on-halve for size rejections ---
     max_attempts = 3
     current_size = size
+
+    # For LIMIT orders, compute the entry level in IG's point scale
+    limit_level: float | None = None
+    if order_type == "LIMIT" and entry_level is not None:
+        limit_level = round(float(entry_level) * ig_factor, 1)
 
     for attempt in range(1, max_attempts + 1):
         order = OrderRequest(
@@ -450,6 +459,8 @@ def process_instrument(
             size=current_size,
             stop_distance=stop_distance,
             limit_distance=limit_distance,
+            order_type=order_type,
+            level=limit_level,
         )
         try:
             deal_ref = broker.place_order(order)
@@ -457,7 +468,8 @@ def process_instrument(
             result["deal_ref"] = deal_ref
             result["note"] = (
                 f"deal_ref={deal_ref} stop={llm_stop} target={llm_tp} "
-                f"risk={risk_pct}% size={current_size} entry_ref={entry_level}"
+                f"risk={risk_pct}% size={current_size} entry_ref={entry_level} "
+                f"order_type={order_type}"
             )
 
             log_event(
@@ -475,6 +487,7 @@ def process_instrument(
                     "risk_pct": risk_pct,
                     "entry_level": entry_level,
                     "epic": epic,
+                    "order_type": order_type,
                     "signal": result["signal"],
                     "signal_date": str(signal_date),
                     "llm_recommendation": llm_rec,
@@ -519,43 +532,36 @@ def process_instrument(
 # ---------------------------------------------------------------------------
 
 def _print_results_table(results: list[dict]) -> None:
-    """Print a summary table to stdout."""
-    col_widths = {
-        "symbol": 10,
-        "signal": 7,
-        "direction": 9,
-        "decision": 12,
-        "action": 28,
-        "note": 60,
-    }
+    """Print a summary table to stdout with dynamic column widths."""
+    # Build row data first so we can measure widths
+    rows: list[tuple[str, ...]] = []
+    for r in results:
+        sig_str = {1: "LONG", -1: "SHORT", 0: "FLAT"}.get(r["signal"], str(r["signal"]))
+        rows.append((
+            r["symbol"],
+            sig_str,
+            r.get("direction") or "",
+            str(r.get("decision") or ""),
+            r["action"],
+            r["note"],
+        ))
 
-    header = (
-        f"{'SYMBOL':<{col_widths['symbol']}}  "
-        f"{'SIGNAL':<{col_widths['signal']}}  "
-        f"{'DIR':<{col_widths['direction']}}  "
-        f"{'DECISION':<{col_widths['decision']}}  "
-        f"{'ACTION':<{col_widths['action']}}  "
-        f"{'NOTE':<{col_widths['note']}}"
-    )
-    sep = "-" * len(header)
+    headers = ("SYMBOL", "SIGNAL", "DIR", "DECISION", "ACTION", "NOTE")
+    # Calculate width per column: max of header and all row values
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, val in enumerate(row):
+            widths[i] = max(widths[i], len(val))
+
+    fmt = "  ".join(f"{{:<{w}}}" for w in widths)
+    sep = "-" * (sum(widths) + 2 * (len(widths) - 1))
 
     print()
     print(sep)
-    print(header)
+    print(fmt.format(*headers))
     print(sep)
-
-    for r in results:
-        sig_str = {1: "LONG", -1: "SHORT", 0: "FLAT"}.get(r["signal"], str(r["signal"]))
-        dir_str = r.get("direction") or ""
-        print(
-            f"{r['symbol']:<{col_widths['symbol']}}  "
-            f"{sig_str:<{col_widths['signal']}}  "
-            f"{dir_str:<{col_widths['direction']}}  "
-            f"{str(r['decision'] or ''):<{col_widths['decision']}}  "
-            f"{r['action']:<{col_widths['action']}}  "
-            f"{r['note']:<{col_widths['note']}}"
-        )
-
+    for row in rows:
+        print(fmt.format(*row))
     print(sep)
     print()
 
