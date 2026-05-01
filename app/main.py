@@ -13,6 +13,20 @@ from pathlib import Path
 
 import streamlit as st
 
+st.set_page_config(layout="wide")
+
+# Auth gate
+if not st.user.is_logged_in:
+    st.title("Trading Lab")
+    st.button("Log in with Google", on_click=st.login)
+    st.stop()
+
+ALLOWED_EMAILS = {"jokikiolu@gmail.com"}
+if st.user.email not in ALLOWED_EMAILS:
+    st.error("Unauthorized. Access restricted.")
+    st.logout()
+    st.stop()
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
@@ -42,6 +56,7 @@ pg = st.navigation([dashboard, charts, backtests, settings])
 
 with st.sidebar:
     st.title("Trading Lab")
+    st.button("Logout", on_click=st.logout)
 
     # Environment badge
     try:
