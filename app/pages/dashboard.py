@@ -590,6 +590,21 @@ def _render_signal_table(df: pd.DataFrame) -> None:
 
 def main() -> None:
     st.set_page_config(layout="wide")
+
+    # Auth gate
+    if not st.user.is_logged_in:
+        st.title("Trading Lab")
+        st.button("Log in with Google", on_click=st.login)
+        st.stop()
+
+    ALLOWED_EMAILS = {"jokikiolu@gmail.com"}
+    if st.user.email not in ALLOWED_EMAILS:
+        st.error("Unauthorized. Access restricted.")
+        st.logout()
+        st.stop()
+
+    st.sidebar.button("Logout", on_click=st.logout)
+
     st.title("Dashboard")
 
     # --- Snapshot load ---

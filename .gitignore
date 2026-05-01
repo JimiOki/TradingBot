@@ -13,3 +13,4 @@ data/curated/
 *.png
 *.drawio.bkp
 src/trading_lab.egg-info/
+.streamlit/secrets.toml
