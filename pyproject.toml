@@ -9,6 +9,7 @@ description = "Local research and execution environment for systematic trading."
 requires-python = ">=3.11"
 dependencies = [
   "anthropic",
+  "authlib",
   "google-genai",
   "matplotlib",
   "numpy",

@@ -38,6 +38,8 @@ from trading_lab.audit import AuditAction, log_event
 from trading_lab.config.loader import load_instruments
 from trading_lab.execution.broker_base import OrderRequest
 from trading_lab.execution.ig import IgBrokerAdapter
+from trading_lab.llm.context import SignalContext
+from trading_lab.llm.decision import DecisionService, PositionManagementDecision
 from trading_lab.logging_config import setup_logging
 from trading_lab.paths import (
     DECISIONS_DIR,
@@ -234,6 +236,7 @@ def process_instrument(
     open_positions: dict[str, dict] | None = None,
     price_factor_map: dict[str, float] | None = None,
     min_size_map: dict[str, float] | None = None,
+    decision_service: DecisionService | None = None,
 ) -> dict:
     """Evaluate one snapshot row and optionally place an order.
 
@@ -345,8 +348,133 @@ def process_instrument(
         pos_size = existing_pos.get("size", 0)
 
         if pos_direction == side:
-            # Same direction — already open, nothing to do
-            result["action"] = "HELD"
+            # Same direction — consult LLM for position management
+            if decision_service is not None and not dry_run:
+                try:
+                    # Get position details
+                    pos_open_level = existing_pos.get("open_level", 0)
+                    pos_current_level = existing_pos.get("current_level", 0)
+                    pos_stop = existing_pos.get("stop_level")
+                    pos_limit = existing_pos.get("limit_level")
+                    pos_pnl = existing_pos.get("pnl", 0)
+
+                    # Calculate P&L in points
+                    if pos_direction == "BUY":
+                        pnl_points = pos_current_level - pos_open_level
+                    else:
+                        pnl_points = pos_open_level - pos_current_level
+
+                    llm_direction = _ig_direction_to_llm(pos_direction)
+
+                    # Build context from snapshot row
+                    context = SignalContext(
+                        instrument_name=symbol,
+                        symbol=symbol,
+                        signal_date=signal_date,
+                        signal=result["signal"] or 0,
+                        signal_direction=llm_direction,
+                        close=close or pos_current_level,
+                        fast_sma=float(row.get("fast_sma", 0) or 0),
+                        slow_sma=float(row.get("slow_sma", 0) or 0),
+                        rsi=float(row.get("rsi", 50) or 50),
+                        recent_trend_summary=str(row.get("recent_trend_summary", "N/A") or "N/A"),
+                        stop_loss_level=float(llm_stop or pos_stop or 0),
+                        take_profit_level=float(llm_tp or pos_limit or 0),
+                        risk_reward_ratio=float(row.get("risk_reward_ratio", 0) or 0),
+                        confidence_score=int(row.get("confidence_score", 0) or 0),
+                        conflicting_indicators=bool(row.get("conflicting_indicators", False)),
+                        high_volatility=bool(row.get("high_volatility", False)),
+                        news_headlines=[],  # News not available at execution time
+                        strategy_signals=dict(row.get("strategy_signals", {}) or {}),
+                    )
+
+                    # Use current stop/limit, falling back to LLM's original levels
+                    current_stop = pos_stop if pos_stop else (float(llm_stop) if llm_stop else 0)
+                    current_target = pos_limit if pos_limit else (float(llm_tp) if llm_tp else 0)
+
+                    mgmt = decision_service.manage_position(
+                        context=context,
+                        position_direction=llm_direction,
+                        entry_level=pos_open_level,
+                        current_stop=current_stop,
+                        current_target=current_target,
+                        pnl_points=pnl_points,
+                    )
+
+                    if mgmt.recommendation == "CLOSE":
+                        # LLM wants to close
+                        try:
+                            close_ref = broker.close_position(pos_deal_id, pos_direction, pos_size)
+                            result["action"] = "CLOSED"
+                            result["deal_ref"] = close_ref
+                            result["note"] = f"position management: CLOSE — {mgmt.rationale}"
+                            logger.info("  CLOSED %s — LLM position management (ref=%s)", symbol, close_ref)
+                        except Exception as exc:
+                            result["action"] = "CLOSE_FAILED"
+                            result["note"] = f"position management CLOSE failed: {exc}"
+                            logger.error("  CLOSE FAILED %s — %s", symbol, exc)
+                        return result
+
+                    elif mgmt.recommendation == "ADJUST":
+                        # Validate stop ratchet: stops can only move in profitable direction
+                        new_stop = mgmt.stop_loss
+                        new_target = mgmt.take_profit
+
+                        # Apply price factor for IG
+                        if price_factor_map is None:
+                            price_factor_map = {}
+                        ig_factor = price_factor_map.get(symbol, 1.0)
+
+                        # Stop ratchet validation (in Yahoo price space, before IG scaling)
+                        if new_stop is not None and current_stop:
+                            if llm_direction == "LONG" and new_stop < current_stop:
+                                logger.warning("  %s — stop ratchet: rejecting stop %.4f < current %.4f for LONG", symbol, new_stop, current_stop)
+                                new_stop = None  # reject — can't widen stop on long
+                            elif llm_direction == "SHORT" and new_stop > current_stop:
+                                logger.warning("  %s — stop ratchet: rejecting stop %.4f > current %.4f for SHORT", symbol, new_stop, current_stop)
+                                new_stop = None  # reject — can't widen stop on short
+
+                        # Convert to IG price scale
+                        ig_stop = round(new_stop * ig_factor, 1) if new_stop else None
+                        ig_target = round(new_target * ig_factor, 1) if new_target else None
+
+                        if ig_stop is not None or ig_target is not None:
+                            try:
+                                update_ref = broker.update_position(pos_deal_id, stop_level=ig_stop, limit_level=ig_target)
+                                result["action"] = "ADJUSTED"
+                                result["deal_ref"] = update_ref
+                                changes = []
+                                if new_stop:
+                                    changes.append(f"stop→{new_stop:.4f}")
+                                if new_target:
+                                    changes.append(f"target→{new_target:.4f}")
+                                result["note"] = f"position management: ADJUST {', '.join(changes)} — {mgmt.rationale}"
+                                logger.info("  ADJUSTED %s — %s (ref=%s)", symbol, ', '.join(changes), update_ref)
+                            except Exception as exc:
+                                result["action"] = "ADJUST_FAILED"
+                                result["note"] = f"position management ADJUST failed: {exc}"
+                                logger.error("  ADJUST FAILED %s — %s", symbol, exc)
+                        else:
+                            result["action"] = "HELD"
+                            result["note"] = f"ADJUST requested but no valid changes after ratchet — {mgmt.rationale}"
+                            logger.info("  HELD %s — adjust had no valid changes", symbol)
+                        return result
+
+                    else:  # HOLD
+                        result["action"] = "HELD"
+                        result["note"] = f"position management: HOLD — {mgmt.rationale}"
+                        logger.info("  HELD %s — LLM says hold (deal_id=%s)", symbol, pos_deal_id)
+                        return result
+
+                except Exception as exc:
+                    # If position management fails, fall back to simple HELD
+                    logger.warning("  Position management failed for %s, defaulting to HELD: %s", symbol, exc)
+                    result["action"] = "HELD"
+                    result["note"] = f"position already open {pos_direction} (mgmt error: {exc})"
+                    return result
+
+            # Dry run or no decision service — simple hold
+            result["action"] = "HELD" if not dry_run else "DRY RUN: would hold"
             result["note"] = f"position already open in same direction ({pos_direction}, deal_id={pos_deal_id})"
             logger.info("  HELD %s — position already open %s (deal_id=%s)", symbol, pos_direction, pos_deal_id)
             return result
@@ -649,6 +777,16 @@ def main() -> None:
             sys.exit(1)
         logger.warning("Could not fetch balance (dry run continues with £%.0f): %s", capital, exc)
 
+    # Create decision service for position management
+    decision_service: DecisionService | None = None
+    try:
+        from trading_lab.llm.gemini_client import GeminiClient
+        llm_client = GeminiClient()
+        decision_service = DecisionService(llm_client)
+        logger.info("Decision service initialized for position management")
+    except Exception as exc:
+        logger.warning("Could not initialize decision service: %s — position management disabled", exc)
+
     # Fetch open positions for position management
     open_positions = _fetch_open_positions_map(broker, epic_map)
 
@@ -667,6 +805,7 @@ def main() -> None:
             open_positions=open_positions,
             price_factor_map=price_factor_map,
             min_size_map=min_size_map,
+            decision_service=decision_service,
         )
         results.append(result)
 
@@ -679,10 +818,11 @@ def main() -> None:
     placed = [r for r in results if r["action"] == "PLACED"]
     would_place = [r for r in results if r["action"] == "DRY RUN: would place"]
     would_close = [r for r in results if r["action"] == "DRY RUN: would close"]
-    failed = [r for r in results if r["action"] in ("FAILED", "CLOSE_FAILED")]
+    failed = [r for r in results if r["action"] in ("FAILED", "CLOSE_FAILED", "ADJUST_FAILED")]
     skipped = [r for r in results if r["action"] == "SKIPPED"]
     closed = [r for r in results if r["action"] == "CLOSED"]
     held = [r for r in results if r["action"] == "HELD"]
+    adjusted = [r for r in results if r["action"] == "ADJUSTED"]
 
     if dry_run:
         logger.info(
@@ -694,9 +834,10 @@ def main() -> None:
         )
     else:
         logger.info(
-            "Execution complete — placed: %d | closed: %d | held: %d | failed: %d | skipped: %d",
+            "Execution complete — placed: %d | closed: %d | adjusted: %d | held: %d | failed: %d | skipped: %d",
             len(placed),
             len(closed),
+            len(adjusted),
             len(held),
             len(failed),
             len(skipped),

@@ -121,6 +121,54 @@ conflicts_with_technical should be true ONLY when the technical consensus has a 
 """
 
 
+POSITION_MANAGEMENT_PROMPT = """\
+You are a discretionary spread-betting trader managing an existing position on {instrument_name} ({symbol}).
+
+## Your Open Position
+- Direction: {position_direction}
+- Entry Price: {entry_level:.4f}
+- Current Price: {close:.4f}
+- Unrealised P&L: {pnl_points:+.1f} points ({pnl_direction})
+- Current Stop: {current_stop:.4f}
+- Current Target: {current_target:.4f}
+
+## Technical Evidence
+- Date: {signal_date}
+- Fast SMA: {fast_sma:.4f} | Slow SMA: {slow_sma:.4f}
+- RSI (14): {rsi:.1f} | Trend: {recent_trend_summary}
+- Conflicting Indicators: {conflicting_indicators} | High Volatility: {high_volatility}
+
+{strategy_signals_section}
+{news_section}
+
+## How to reason
+- You already have a position. The question is NOT whether to open a new trade — it's whether to HOLD, ADJUST, or CLOSE the existing one.
+- HOLD: the trade thesis is still valid, no changes needed
+- ADJUST: the trade thesis is still valid but stop or target should be updated based on new price action
+  - Stops should generally move in the profitable direction (trailing stop) — tightening to lock in gains
+  - For LONG positions: new stop must be >= current stop (never widen a losing stop)
+  - For SHORT positions: new stop must be <= current stop (never widen a losing stop)
+  - Targets can move in either direction (take profit early or extend a runner)
+- CLOSE: the original thesis has been invalidated — close the position now
+  - Close if the trend has reversed, key support/resistance has broken, or a major news event changes the outlook
+  - Close if most strategies have flipped against your direction
+
+Respond ONLY with a JSON object. No text outside the JSON.
+
+Required format:
+{{{{
+  "recommendation": "HOLD" | "ADJUST" | "CLOSE",
+  "stop_loss": <float or null>,
+  "take_profit": <float or null>,
+  "rationale": "2-3 sentences explaining your decision"
+}}}}
+
+When recommendation is HOLD: stop_loss and take_profit should be null (keep current levels).
+When recommendation is ADJUST: stop_loss and/or take_profit should be the NEW levels. Only include the one(s) you want to change.
+When recommendation is CLOSE: stop_loss and take_profit should be null.
+"""
+
+
 def _format_news_section(headlines: list[dict]) -> str:
     """Format a list of news headline dicts into a readable string.
 
@@ -239,4 +287,43 @@ def build_decision_prompt(context: "SignalContext") -> str:
         high_volatility=context.high_volatility,
         news_section=news_section,
         strategy_signals_section=strategy_signals_section,
+    )
+
+
+def build_position_management_prompt(
+    context: "SignalContext",
+    position_direction: str,
+    entry_level: float,
+    current_stop: float,
+    current_target: float,
+    pnl_points: float,
+) -> str:
+    """Build the position management prompt for an existing open position."""
+    if context.news_headlines:
+        news_section = "\n## Recent News Headlines\n" + _format_news_section(context.news_headlines)
+    else:
+        news_section = ""
+    strategy_signals_section = _format_strategy_signals(context.strategy_signals)
+
+    pnl_direction = "profit" if pnl_points >= 0 else "loss"
+
+    return POSITION_MANAGEMENT_PROMPT.format(
+        instrument_name=context.instrument_name,
+        symbol=context.symbol,
+        signal_date=context.signal_date,
+        close=context.close,
+        fast_sma=context.fast_sma,
+        slow_sma=context.slow_sma,
+        rsi=context.rsi,
+        recent_trend_summary=context.recent_trend_summary,
+        conflicting_indicators=context.conflicting_indicators,
+        high_volatility=context.high_volatility,
+        news_section=news_section,
+        strategy_signals_section=strategy_signals_section,
+        position_direction=position_direction,
+        entry_level=entry_level,
+        current_stop=current_stop,
+        current_target=current_target,
+        pnl_points=pnl_points,
+        pnl_direction=pnl_direction,
     )

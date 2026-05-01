@@ -15,7 +15,7 @@ from trading_lab.audit import AuditAction, log_event
 from trading_lab.exceptions import LLMError, LLMTimeoutError
 from trading_lab.llm.base import LLMClient
 from trading_lab.llm.context import SignalContext
-from trading_lab.llm.prompts import build_decision_prompt
+from trading_lab.llm.prompts import build_decision_prompt, build_position_management_prompt
 from trading_lab.paths import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,18 @@ class LLMDecision:
     generated_at: datetime
     model: str
     cached: bool
+
+
+@dataclass(frozen=True)
+class PositionManagementDecision:
+    """LLM recommendation for managing an existing position."""
+    symbol: str
+    recommendation: str  # "HOLD", "ADJUST", "CLOSE"
+    stop_loss: float | None
+    take_profit: float | None
+    rationale: str
+    generated_at: datetime
+    model: str
 
 
 class DecisionService:
@@ -248,4 +260,85 @@ class DecisionService:
             "risk_pct": risk_pct,
             "rationale": str(data.get("rationale", DECISION_UNAVAILABLE)),
             "conflicts_with_technical": bool(data.get("conflicts_with_technical", False)),
+        }
+
+    def manage_position(
+        self,
+        context: SignalContext,
+        position_direction: str,
+        entry_level: float,
+        current_stop: float,
+        current_target: float,
+        pnl_points: float,
+    ) -> PositionManagementDecision:
+        """Generate an LLM decision for managing an existing position.
+
+        NOT cached — position context changes every session.
+        """
+        prompt = build_position_management_prompt(
+            context, position_direction, entry_level,
+            current_stop, current_target, pnl_points,
+        )
+        try:
+            raw = self._client.complete(prompt)
+            parsed = self._parse_position_management(raw)
+        except (LLMError, LLMTimeoutError, ValueError) as exc:
+            logger.warning("LLM position management failed for %s: %s", context.symbol, exc)
+            return PositionManagementDecision(
+                symbol=context.symbol,
+                recommendation="HOLD",
+                stop_loss=None,
+                take_profit=None,
+                rationale=f"LLM unavailable: {exc}",
+                generated_at=datetime.now(timezone.utc),
+                model=getattr(self._client, "model", "stub"),
+            )
+
+        return PositionManagementDecision(
+            symbol=context.symbol,
+            recommendation=parsed["recommendation"],
+            stop_loss=parsed.get("stop_loss"),
+            take_profit=parsed.get("take_profit"),
+            rationale=parsed.get("rationale", ""),
+            generated_at=datetime.now(timezone.utc),
+            model=getattr(self._client, "model", "stub"),
+        )
+
+    def _parse_position_management(self, raw: str) -> dict:
+        """Parse LLM JSON response for position management."""
+        text = raw.strip()
+        if text.startswith("```"):
+            lines = text.split("\n")
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"LLM response is not valid JSON: {exc}") from exc
+
+        recommendation = data.get("recommendation", "").upper()
+        if recommendation not in {"HOLD", "ADJUST", "CLOSE"}:
+            raise ValueError(f"Unrecognised position management recommendation '{recommendation}'")
+
+        stop_loss = data.get("stop_loss")
+        take_profit = data.get("take_profit")
+
+        if recommendation == "ADJUST":
+            try:
+                stop_loss = float(stop_loss) if stop_loss is not None else None
+            except (TypeError, ValueError):
+                stop_loss = None
+            try:
+                take_profit = float(take_profit) if take_profit is not None else None
+            except (TypeError, ValueError):
+                take_profit = None
+        else:
+            stop_loss = None
+            take_profit = None
+
+        return {
+            "recommendation": recommendation,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "rationale": str(data.get("rationale", "")),
         }

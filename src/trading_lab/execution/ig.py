@@ -202,6 +202,19 @@ class IgBrokerAdapter(BrokerAdapter):
                     else:
                         pnl = (open_level - current_level) * size
 
+                    # Stop / limit levels (may be absent or NaN)
+                    stop_level = row.get("stopLevel") or row.get("stop_level")
+                    limit_level = row.get("limitLevel") or row.get("limit_level")
+
+                    try:
+                        stop_level = float(stop_level) if stop_level not in (None, "", "nan") else None
+                    except (TypeError, ValueError):
+                        stop_level = None
+                    try:
+                        limit_level = float(limit_level) if limit_level not in (None, "", "nan") else None
+                    except (TypeError, ValueError):
+                        limit_level = None
+
                     positions.append(
                         {
                             "deal_id": deal_id,
@@ -214,6 +227,8 @@ class IgBrokerAdapter(BrokerAdapter):
                             "pnl": round(pnl, 2),
                             "currency": currency,
                             "instrument_name": instrument_name,
+                            "stop_level": stop_level,
+                            "limit_level": limit_level,
                         }
                     )
                 except Exception as row_exc:
@@ -342,6 +357,80 @@ class IgBrokerAdapter(BrokerAdapter):
                 "Could not fetch confirm for close %s: %s — treating as closed",
                 deal_ref, exc,
             )
+
+        return deal_ref
+
+    # ------------------------------------------------------------------
+    # Position update (stop / limit)
+    # ------------------------------------------------------------------
+
+    def update_position(self, deal_id: str, stop_level: float | None = None, limit_level: float | None = None) -> str:
+        """Update stop and/or limit on an existing IG position.
+
+        Uses PUT /positions/otc/{dealId} (v2).
+
+        Args:
+            deal_id: The IG deal ID.
+            stop_level: New absolute stop level, or None to leave unchanged.
+            limit_level: New absolute limit/target level, or None to leave unchanged.
+
+        Returns:
+            IG deal reference string.
+
+        Raises:
+            RuntimeError: if IG rejects the update.
+        """
+        ig = self._session()
+
+        body = {}
+        if stop_level is not None:
+            body["stopLevel"] = stop_level
+        if limit_level is not None:
+            body["limitLevel"] = limit_level
+
+        if not body:
+            logger.info("update_position called with no changes for deal_id=%s", deal_id)
+            return ""
+
+        # IG requires trailingStop fields even when not using trailing stops
+        body["trailingStop"] = False
+
+        logger.info(
+            "Updating IG position: deal_id=%s stop=%s limit=%s",
+            deal_id, stop_level, limit_level,
+        )
+
+        headers = dict(ig.session.headers)
+        headers["Version"] = "2"
+        headers["Content-Type"] = "application/json; charset=UTF-8"
+        headers["Accept"] = "application/json; charset=UTF-8"
+
+        resp = requests.put(
+            f"{ig.BASE_URL}/positions/otc/{deal_id}",
+            json=body,
+            headers=headers,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+
+        deal_ref = result.get("dealReference", "")
+        if not deal_ref:
+            raise RuntimeError(f"IG returned no deal reference on update: {result}")
+
+        # Confirm
+        try:
+            confirm = ig.fetch_deal_by_deal_reference(deal_ref)
+            deal_status = confirm.get("dealStatus", "UNKNOWN")
+            reason = confirm.get("reason", "")
+            if deal_status != "ACCEPTED":
+                raise RuntimeError(
+                    f"IG rejected position update {deal_ref}: status={deal_status} reason={reason}"
+                )
+            logger.info("IG position updated — deal_reference=%s", deal_ref)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            logger.warning("Could not fetch confirm for update %s: %s — treating as updated", deal_ref, exc)
 
         return deal_ref
 
