@@ -29,6 +29,9 @@ class SignalContext:
     high_volatility: bool
     news_headlines: list[dict]    # each: {title, source, timestamp}; empty if none
     strategy_signals: dict        # {"sma_cross": 1, "macd": -1, "bollinger": 0, "donchian": 1, "rsi_reversion": -1}
+    support_levels: list[float] | None = None   # nearest swing lows below current price
+    resistance_levels: list[float] | None = None  # nearest swing highs above current price
+    volume_ratio: float | None = None           # current volume / 20-day avg volume
 
 
 def build_signal_context(
@@ -36,6 +39,9 @@ def build_signal_context(
     instrument: dict,
     news: list[dict],
     strategy_signals: dict = None,
+    support_levels: list[float] | None = None,
+    resistance_levels: list[float] | None = None,
+    volume_ratio: float | None = None,
 ) -> SignalContext:
     """Build a SignalContext from a signal row dict and instrument config dict.
 
@@ -84,4 +90,7 @@ def build_signal_context(
         high_volatility=bool(signal_row.get("high_volatility", False)),
         news_headlines=news or [],
         strategy_signals=strategy_signals if strategy_signals is not None else {},
+        support_levels=support_levels,
+        resistance_levels=resistance_levels,
+        volume_ratio=volume_ratio,
     )

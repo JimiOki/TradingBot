@@ -26,6 +26,12 @@ professional trader who needs your honest view, not a disclaimer.
 
 {strategy_signals_section}
 
+## Key Price Levels
+{sr_section}
+
+## Volume
+{volume_section}
+
 ## News & Sentiment
 {news_section}
 
@@ -56,6 +62,12 @@ on its strength and reliability. Be direct — this is for a professional trader
 
 {strategy_signals_section}
 
+## Key Price Levels
+{sr_section}
+
+## Volume
+{volume_section}
+
 ## Your Analysis (3-4 sentences)
 Explain what the technical picture is saying, how strong the conviction is given \
 the strategy consensus, and what the main risk to this signal is.
@@ -74,6 +86,12 @@ all of it, reach a conviction, and specify the trade parameters if acting.
 - Conflicting Indicators: {conflicting_indicators} | High Volatility: {high_volatility}
 
 {strategy_signals_section}
+
+## Key Price Levels
+{sr_section}
+
+## Volume
+{volume_section}
 {news_section}
 
 ## How to reason
@@ -139,6 +157,9 @@ You are a discretionary spread-betting trader managing an existing position on {
 - Conflicting Indicators: {conflicting_indicators} | High Volatility: {high_volatility}
 
 {strategy_signals_section}
+
+## Key Price Levels
+{sr_section}
 {news_section}
 
 ## How to reason
@@ -167,6 +188,38 @@ When recommendation is HOLD: stop_loss and take_profit should be null (keep curr
 When recommendation is ADJUST: stop_loss and/or take_profit should be the NEW levels. Only include the one(s) you want to change.
 When recommendation is CLOSE: stop_loss and take_profit should be null.
 """
+
+
+def _format_sr_section(context: "SignalContext") -> str:
+    """Format support/resistance levels for the prompt."""
+    lines = []
+    if context.resistance_levels:
+        res = [f"{r:.4f}" for r in context.resistance_levels[:3]]
+        lines.append(f"- Resistance (swing highs above): {', '.join(res)}")
+    if context.support_levels:
+        sup = [f"{s:.4f}" for s in context.support_levels[:3]]
+        lines.append(f"- Support (swing lows below): {', '.join(sup)}")
+    if not lines:
+        return "No recent swing levels identified."
+    return "\n".join(lines)
+
+
+def _format_volume_section(context: "SignalContext") -> str:
+    """Format volume context for the prompt."""
+    if context.volume_ratio is None:
+        return "Volume data not available."
+    ratio = context.volume_ratio
+    if ratio > 1.5:
+        desc = "significantly above average"
+    elif ratio > 1.1:
+        desc = "above average"
+    elif ratio > 0.9:
+        desc = "near average"
+    elif ratio > 0.5:
+        desc = "below average"
+    else:
+        desc = "very low"
+    return f"- Current volume: {ratio:.1f}x 20-day average ({desc})"
 
 
 def _format_news_section(headlines: list[dict]) -> str:
@@ -236,6 +289,8 @@ def build_explanation_prompt(context: "SignalContext", fast_sma_period: int = 20
     """Build the explanation prompt for a given SignalContext."""
     news_section = _format_news_section(context.news_headlines)
     strategy_signals_section = _format_strategy_signals(context.strategy_signals)
+    sr_section = _format_sr_section(context)
+    volume_section = _format_volume_section(context)
     kwargs = dict(
         instrument_name=context.instrument_name,
         symbol=context.symbol,
@@ -256,6 +311,8 @@ def build_explanation_prompt(context: "SignalContext", fast_sma_period: int = 20
         high_volatility=context.high_volatility,
         news_section=news_section,
         strategy_signals_section=strategy_signals_section,
+        sr_section=sr_section,
+        volume_section=volume_section,
     )
     if context.news_headlines:
         return EXPLANATION_PROMPT_WITH_NEWS.format(**kwargs)
@@ -269,6 +326,8 @@ def build_decision_prompt(context: "SignalContext") -> str:
     else:
         news_section = ""
     strategy_signals_section = _format_strategy_signals(context.strategy_signals)
+    sr_section = _format_sr_section(context)
+    volume_section = _format_volume_section(context)
     return DECISION_PROMPT.format(
         instrument_name=context.instrument_name,
         symbol=context.symbol,
@@ -287,6 +346,8 @@ def build_decision_prompt(context: "SignalContext") -> str:
         high_volatility=context.high_volatility,
         news_section=news_section,
         strategy_signals_section=strategy_signals_section,
+        sr_section=sr_section,
+        volume_section=volume_section,
     )
 
 
@@ -304,6 +365,7 @@ def build_position_management_prompt(
     else:
         news_section = ""
     strategy_signals_section = _format_strategy_signals(context.strategy_signals)
+    sr_section = _format_sr_section(context)
 
     pnl_direction = "profit" if pnl_points >= 0 else "loss"
 
@@ -320,6 +382,7 @@ def build_position_management_prompt(
         high_volatility=context.high_volatility,
         news_section=news_section,
         strategy_signals_section=strategy_signals_section,
+        sr_section=sr_section,
         position_direction=position_direction,
         entry_level=entry_level,
         current_stop=current_stop,

@@ -97,6 +97,45 @@ def bollinger_bands(series: pd.Series, window: int = 20, num_std: float = 2.0) -
     return pd.DataFrame({"upper": upper, "middle": middle, "lower": lower}, index=series.index)
 
 
+def find_swing_levels(
+    highs: list[float], lows: list[float], window: int = 2
+) -> tuple[list[float], list[float]]:
+    """Find swing high and swing low levels from price data.
+
+    A swing high is a bar whose high is higher than the ``window`` bars on
+    either side.  A swing low is a bar whose low is lower than the ``window``
+    bars on either side.
+
+    Args:
+        highs: List of high prices (oldest first).
+        lows:  List of low prices (oldest first).
+        window: Number of bars either side to compare (default 2).
+
+    Returns:
+        (swing_highs, swing_lows) — lists of price levels, most recent first.
+    """
+    swing_highs: list[float] = []
+    swing_lows: list[float] = []
+
+    for i in range(window, len(highs) - window):
+        # Swing high: higher than all bars in window either side
+        if all(highs[i] > highs[i - j] for j in range(1, window + 1)) and all(
+            highs[i] > highs[i + j] for j in range(1, window + 1)
+        ):
+            swing_highs.append(highs[i])
+
+        # Swing low: lower than all bars in window either side
+        if all(lows[i] < lows[i - j] for j in range(1, window + 1)) and all(
+            lows[i] < lows[i + j] for j in range(1, window + 1)
+        ):
+            swing_lows.append(lows[i])
+
+    # Return most recent first
+    swing_highs.reverse()
+    swing_lows.reverse()
+    return swing_highs, swing_lows
+
+
 def donchian_channel(high: pd.Series, low: pd.Series, window: int = 20) -> pd.DataFrame:
     """Donchian Channel: N-period high, low, and mid.
 

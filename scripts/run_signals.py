@@ -44,6 +44,7 @@ from trading_lab.audit import AuditAction, log_event
 from trading_lab.config.loader import load_instruments
 from trading_lab.data.ig_sentiment_fetcher import fetch_ig_sentiment_headline
 from trading_lab.data.news_fetcher import fetch_news
+from trading_lab.features.indicators import find_swing_levels
 from trading_lab.llm.context import build_signal_context
 from trading_lab.llm.decision import DecisionService
 from trading_lab.llm.explainer import ExplanationService
@@ -110,6 +111,42 @@ def _build_news(symbol: str, instrument: dict, signal_date: str) -> list[dict]:
         logger.warning("Failed to persist news for %s: %s", symbol, exc)
 
     return headlines
+
+
+def _compute_sr_and_volume(bars: pd.DataFrame, current_close: float) -> dict:
+    """Compute support/resistance levels and volume ratio from daily bars.
+
+    Returns a dict with keys: support_levels, resistance_levels, volume_ratio.
+    Any value may be None if insufficient data.
+    """
+    result: dict = {"support_levels": None, "resistance_levels": None, "volume_ratio": None}
+
+    # Use the last 60 bars for swing level detection
+    recent = bars.tail(60)
+    if len(recent) < 5:
+        return result
+
+    highs = recent["High"].tolist() if "High" in recent.columns else []
+    lows = recent["Low"].tolist() if "Low" in recent.columns else []
+
+    if highs and lows:
+        swing_highs, swing_lows = find_swing_levels(highs, lows, window=2)
+        # Filter to nearest 3 above (resistance) and 3 below (support) current close
+        resistance = sorted([h for h in swing_highs if h > current_close])[:3]
+        support = sorted([s for s in swing_lows if s < current_close], reverse=True)[:3]
+        result["resistance_levels"] = resistance if resistance else None
+        result["support_levels"] = support if support else None
+
+    # Volume ratio: latest volume / 20-day average
+    vol_col = "Volume" if "Volume" in bars.columns else None
+    if vol_col and len(bars) >= 20:
+        vol_series = bars[vol_col].tail(20)
+        avg_vol = vol_series.mean()
+        latest_vol = bars[vol_col].iloc[-1]
+        if avg_vol and avg_vol > 0:
+            result["volume_ratio"] = round(float(latest_vol / avg_vol), 2)
+
+    return result
 
 
 def curated_path_for(symbol: str, timeframe: str, source: str) -> Path:
@@ -304,11 +341,15 @@ def process_instrument_multi(
             **row,
             "signal_date": primary_signals_df.index[-1].date() if hasattr(primary_signals_df.index[-1], "date") else date.today(),
         }
+        sr_vol = _compute_sr_and_volume(bars, float(row["close"])) if row["close"] is not None else {}
         ctx = build_signal_context(
             signal_row=signal_row_for_llm,
             instrument=instrument,
             news=_build_news(symbol, instrument, str(primary_signals_df.index[-1].date())),
             strategy_signals=strategy_signals,
+            support_levels=sr_vol.get("support_levels"),
+            resistance_levels=sr_vol.get("resistance_levels"),
+            volume_ratio=sr_vol.get("volume_ratio"),
         )
         explanation_svc.get_or_generate(ctx)
         decision_svc.get_or_generate(ctx)
@@ -398,10 +439,14 @@ def process_instrument(instrument: dict, strategy, explanation_svc: ExplanationS
                     **row,
                     "signal_date": signals.index[-1].date() if hasattr(signals.index[-1], "date") else date.today(),
                 }
+                sr_vol = _compute_sr_and_volume(bars, float(last["close"]))
                 ctx = build_signal_context(
                     signal_row=signal_row_for_llm,
                     instrument=instrument,
                     news=_build_news(symbol, instrument, str(signals.index[-1].date())),  # REQ-LLM-008
+                    support_levels=sr_vol.get("support_levels"),
+                    resistance_levels=sr_vol.get("resistance_levels"),
+                    volume_ratio=sr_vol.get("volume_ratio"),
                 )
                 explanation_svc.get_or_generate(ctx)
                 decision_svc.get_or_generate(ctx)
