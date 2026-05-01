@@ -1,0 +1,15 @@
+{
+  "symbol": "^GSPC",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "entry_level": 7154.7002,
+  "stop_loss": 7032.5001,
+  "take_profit": 7399.1004,
+  "risk_pct": 2.0,
+  "rationale": "The S&P 500 is in a strong uptrend, trading well above its SMAs, and is reportedly at 'record highs' driven by robust optimism in the AI infrastructure and energy sectors. Although technical strategy consensus is weak and the RSI is elevated, the overwhelming positive news catalysts suggest continued momentum, overshadowing cautionary warnings about future earnings or sector-specific risks.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-27T15:17:55.796518+00:00",
+  "model": "gemini-2.5-flash"
+}

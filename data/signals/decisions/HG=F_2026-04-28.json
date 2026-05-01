@@ -1,0 +1,15 @@
+{
+  "symbol": "HG=F",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "entry_level": 5.9795,
+  "stop_loss": 5.8329,
+  "take_profit": 6.2728,
+  "risk_pct": 1.5,
+  "rationale": "Copper's price is trading above its fast and slow SMAs with an RSI above 50, indicating positive short-term momentum and a bullish trend. While broader strategy signals are mostly neutral, the setup offers a favorable risk-reward of 2.0x. This is coupled with a long-term demand tailwind for copper from infrastructure investment and clean energy, supporting a long position despite limited immediate news catalysts.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-28T10:15:44.112715+00:00",
+  "model": "gemini-2.5-flash"
+}

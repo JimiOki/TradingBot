@@ -1,0 +1,8 @@
+{
+  "symbol": "^DJI",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "explanation": "This SHORT signal for the Dow is a low-conviction mess from a technical standpoint. While it *might* be a mean-reversion play given the recent high above the fast SMA, the bullish SMA crossover and only 1 of 6 strategies agreeing (with one explicitly LONG) completely undermines any confidence in the technical thesis. The key market-moving factor identified by the news is the **growing fear around AI sector growth and spending**, triggered by OpenAI's misses, which has already caused major indices to pull back and injects significant risk ahead of critical Big Tech earnings and a Fed meeting. The news directionally *reinforces* the idea of downside pressure, providing a fundamental justification for a short position, but the technical signal itself is too weak and internally contradictory to carry any weight. I\u2019d lean on the clear negative sentiment shift from the AI narrative, not this flimsy technical call.",
+  "generated_at": "2026-04-29T01:04:40.218237+00:00",
+  "model": "gemini-2.5-flash"
+}

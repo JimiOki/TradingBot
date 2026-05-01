@@ -1,0 +1,8 @@
+{
+  "symbol": "^N225",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "explanation": "Alright, let's cut to the chase on this Nikkei signal.\n\n1.  **Technical Picture:** This SHORT signal looks like a contrarian bet on a mean reversion given the RSI (63.3) pushing overbought, but it's fighting serious momentum with the close 4.9% above its fast SMA. More critically, only 1 of 6 independent strategies agrees with this SHORT, with EMA Crossover flashing LONG, making the stated 75/100 confidence look wildly optimistic and internally inconsistent.\n2.  **Market-Moving News:** The news is unequivocally bullish. Nikkei 225 just closed *above 60,000 for the first time ever*, driven by robust tech earnings (Fanuc, Keyence up 16%) and a broader sentiment that the Japanese bull market is \"not done yet.\"\n3.  **Conflict & Weight:** The news directly and powerfully *undermines* this SHORT signal. You're betting against a fresh all-time high driven by strong fundamentals and overwhelming positive sentiment. Disregard this signal; the macro tailwinds and price breakout carry far more weight than a weak, contrarian technical call here.",
+  "generated_at": "2026-04-28T10:18:25.604673+00:00",
+  "model": "gemini-2.5-flash"
+}

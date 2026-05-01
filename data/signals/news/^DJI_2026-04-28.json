@@ -1,0 +1,44 @@
+[
+  {
+    "title": "IG client sentiment: 50% long / 50% short (SHORT-biased)",
+    "source": "IG Client Sentiment",
+    "timestamp": "",
+    "long_pct": 50.0,
+    "short_pct": 50.0
+  },
+  {
+    "title": "Stock market today: S&P 500, Nasdaq, Dow futures inch up ahead of Mag 7 earnings, last Powell term meeting",
+    "source": "Yahoo Finance",
+    "timestamp": "2026-04-28",
+    "url": "https://finance.yahoo.com/markets/stocks/live/stock-market-today-wednesday-april-29-dow-nasdaq-sp-futures-powell-mag7-231405065.html",
+    "body": "Oops, something went wrong US stock futures hit pause on Wednesday as investors braced for a wave of Big Tech earnings and for what could be Jerome Powell\u2019s final interest-rate announcement as Federal Reserve chair. Contracts on the S&P 500 ( ES=F ) and the Dow Jones Industrial Average ( YM=F ) were little changed. Nasdaq 100 ( NQ=F ) edged up 0.2% after stocks on Wall Street pulled back from record highs on Tuesday. Technology stocks led that decline following a report by The Wall Street Journal that OpenAI missed internal targets for revenue and user growth . Shares in its partner Oracle ( ORCL ) fell 4%, while chipmakers Broadcom ( AVGO ) and Nvidia ( NVDA ) dropped 4% and more than 1%, respectively. That puts the spotlight on Wednesday\u2019s earnings from four members of the \u201cMagnificent"
+  },
+  {
+    "title": "3 Things to Watch at Wednesday\u2019s Fed Meeting and Powell\u2019s Likely Last Conference as Chair",
+    "source": "Barrons.com",
+    "timestamp": "2026-04-29",
+    "url": "https://www.barrons.com/livecoverage/fed-meeting-april-rates-news/card/3-things-to-watch-at-wednesday-s-fed-meeting-and-powell-s-likely-last-conference-as-chair-SGJGAfhmfiO3SCsvFgB2?siteid=yhoof2&yptr=yahoo",
+    "body": "LIVE Last Updated: 3 hours ago By Nicole Goodkind The Federal Reserve\u2019s policy decision Wednesday will almost certainly be a non-event. Rates are going nowhere and the Fed is expected to hold its federal-funds target range at 3.50%\u20133.75% for the third straight meeting. Markets have largely priced out any cuts for the rest of the year. The real action will be elsewhere. Here are three things to watch ahead of Wednesday afternoon."
+  },
+  {
+    "title": "Dow Jones Futures: Seagate, Bloom Energy, Teradyne Lead Earnings Movers After OpenAI Hits Techs; Titans On Tap",
+    "source": "Investor's Business Daily",
+    "timestamp": "2026-04-29",
+    "url": "https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-openai-ai-stocks-seagate-bloom-energy-teradyne-earnings/?src=A00220&yptr=yahoo",
+    "body": "BREAKING: Futures Rise; Three AI Stocks Lead Earnings Movers Dow Jones futures rose slightly overnight, along with S&P 500 futures and Nasdaq futures. AI stocks Seagate Technology (STX), Bloom Energy (BE) and Teradyne (TER) headlined earnings after the close, with the trio big movers overnight. The stock market rally had a weak session, with artificial intelligence plays and chips leading techs lower. Reports of OpenAI missing revenue and user\u2026 4/28/2026 Alissa Coram and Ed Carson walk through Tuesday's market action and discuss key stocks to watch in Stock Market Today. 4/28/2026 Alissa Coram and Ed Carson walk through Tuesday's market action... Get instant access to exclusive stock lists, expert market analysis and powerful tools with 2 months of IBD Digital for only $20! Get market"
+  },
+  {
+    "title": "Review Preview: Macro Storm",
+    "source": "Barrons.com",
+    "timestamp": "2026-04-28",
+    "url": "https://www.barrons.com/articles/stocks-today-fed-vote-big-tech-earnings-53a39a97?siteid=yhoof2&yptr=yahoo",
+    "body": "Don\u2019t Stop the Music. The concerns around artificial intelligence spending loomed large for investors today after the Wall Street Journal reported that OpenAI had missed revenue and user targets . That sent most of the tech sector spiraling\u2014one day before several of the biggest AI spenders are set to announce earnings."
+  },
+  {
+    "title": "Nasdaq, S&P 500 end lower on renewed AI growth worries",
+    "source": "Reuters Videos",
+    "timestamp": "2026-04-28",
+    "url": "https://finance.yahoo.com/video/nasdaq-p-500-end-lower-221116038.html",
+    "body": "Oops, something went wrong <span>STORY: U.S. stocks ended lower on Tuesday, with the Dow ticking down marginally, the S&P 500 shedding about half a percent and the tech-heavy Nasdaq losing nine-tenths of a percent.</span><span>AI-related fears spooked the market after the Wall Street Journal reported that OpenAI missed internal targets for weekly users and revenue, raising concerns about its ability to support its massive spending on data centers.</span><span>:: Oracle</span><span>Those worries brought down shares of Oracle by 4%, as the company is reported to have signed one of the biggest cloud deals ever with OpenAI.</span><span>Chip stocks also dropped, with Nvidia, AMD and Broadcom ending sharply lower. Nvidia-backed CoreWeave also slid nearly 6%.</span><span>AI will remain in the"
+  }
+]

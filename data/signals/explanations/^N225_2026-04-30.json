@@ -1,0 +1,8 @@
+{
+  "symbol": "^N225",
+  "signal_date": "2026-04-30",
+  "signal": 0,
+  "explanation": "This short signal is a complete non-starter; the technical picture is utterly worthless. With all key SMA, trend, and risk metrics undefined, and a 0/6 strategy consensus, there's zero technical conviction here. An RSI of 63.3 isn't even close to being overbought enough to justify a contrarian short on its own.\n\nNews presents a mixed bag: the latest mentions rising oil and interest rates denting Asian markets, aligning somewhat with a short. However, earlier reports highlight Nikkei at YTD highs driven by strong tech performance, with Citi downplaying overheating risks and even suggesting underlying strength.\n\nGiven the fundamental strength pushing the Nikkei higher, and the complete lack of *any* supporting technical evidence, the bearish news isn't nearly enough to justify this trade. This signal is effectively null and void; ignore it.",
+  "generated_at": "2026-04-30T15:10:38.995841+00:00",
+  "model": "gemini-2.5-flash"
+}

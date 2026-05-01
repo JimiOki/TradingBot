@@ -1,0 +1,15 @@
+{
+  "symbol": "GC=F",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 4624.0,
+  "stop_loss": 4771.43,
+  "take_profit": 4329.14,
+  "risk_pct": 2.0,
+  "rationale": "Gold's technicals indicate a bearish trend with price below key moving averages and a weak but aligned SHORT signal from indicators. Crucially, multiple news reports from today confirm gold's retreat due to inflation concerns from rising oil and a hawkish BOJ, further fueled by diplomatic efforts in the Iran conflict. This strong confluence of bearish news and technical weakness supports a short position.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-28T10:14:08.540491+00:00",
+  "model": "gemini-2.5-flash"
+}

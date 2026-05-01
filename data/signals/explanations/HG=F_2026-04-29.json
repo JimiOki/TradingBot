@@ -1,0 +1,8 @@
+{
+  "symbol": "HG=F",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "explanation": "This SHORT signal is fundamentally problematic and poorly supported. The technical picture is messy: while MACD points down, the bullish SMA setup (close above both, fast above slow), the close 1.5% above the fast SMA, and an explicit \"EMA Crossover: LONG\" directly contradict a short position. The stated \"Conflicting Indicators: False\" is demonstrably incorrect, and with only 1 of 6 strategies agreeing, conviction is incredibly weak despite the misleading 75/100 confidence.\n\nThe news identifies robust underlying copper demand and strong pricing as the key macro driver. Boliden explicitly highlights a \"Positive impact of more than SEK3 billion, mainly from gold, silver, and copper\" from metal prices, and Rio Tinto shows significant share price momentum. Reduced Q1 output from Atico and Q2 maintenance for Boliden also suggest near-term supply constraints, which are price-supportive.\n\nThis technical SHORT signal is completely *undermined* by both its own internal inconsistencies and the overwhelmingly positive fundamental news. The signal itself appears broken, and the strong performance reported by major miners due to robust metal prices far outweighs any speculative contrarian play on retail sentiment (IG long) or a single, isolated MACD signal. This is a clear \"stay out\" or even a contrarian long setup if the technicals were coherent.",
+  "generated_at": "2026-04-29T09:21:41.486255+00:00",
+  "model": "gemini-2.5-flash"
+}

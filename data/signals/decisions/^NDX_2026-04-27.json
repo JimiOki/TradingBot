@@ -1,0 +1,15 @@
+{
+  "symbol": "^NDX",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "llm_recommendation": "UNCERTAIN",
+  "direction": null,
+  "entry_level": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "risk_pct": null,
+  "rationale": "The NASDAQ 100 is in a strong uptrend, having recently posted all-time highs driven by robust tech earnings. However, the RSI is significantly overbought (72.9), suggesting a potential near-term pullback or consolidation. Current news indicates a slight dip in futures due to geopolitical tensions, and all independent strategy signals are neutral, providing no clear directional edge.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-27T15:18:30.876562+00:00",
+  "model": "gemini-2.5-flash"
+}

@@ -1,0 +1,15 @@
+{
+  "symbol": "HG=F",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 5.9985,
+  "stop_loss": 6.1,
+  "take_profit": 5.8532,
+  "risk_pct": 2.0,
+  "rationale": "Despite copper's current price being above its SMAs and some bullish news from miners, the overwhelming 87% IG client long sentiment presents a strong contrarian short opportunity. This extreme positioning often precedes a price correction, making a short trade viable to capitalize on a potential shake-out of retail longs towards key support levels.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T09:22:08.806295+00:00",
+  "model": "gemini-2.5-flash"
+}

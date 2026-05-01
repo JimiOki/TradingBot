@@ -1,0 +1,15 @@
+{
+  "symbol": "^N225",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "entry_level": 59917.4609,
+  "stop_loss": 58109.1591,
+  "take_profit": 63534.0646,
+  "risk_pct": 2.5,
+  "rationale": "The Nikkei's unprecedented close above 60000, driven by strong earnings and positive analyst outlook, provides a powerful bullish catalyst. While technical strategy signals are largely neutral, the underlying trend remains strong with price significantly above SMAs and healthy RSI, supporting further upward movement.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-28T10:18:36.764712+00:00",
+  "model": "gemini-2.5-flash"
+}

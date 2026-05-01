@@ -1,0 +1,8 @@
+{
+  "symbol": "NG=F",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "explanation": "This SHORT signal is technically flimsy. While price is below the slow SMA, it's just above the fast SMA, and with only one out of six independent strategies aligning, conviction is incredibly low. The overwhelming market-moving information, however, is the ongoing US-Iran war and the choked Strait of Hormuz, which is explicitly disrupting global *liquefied natural gas (LNG)* flows and driving broad energy prices significantly higher. This news powerfully *challenges* the technical short; a geopolitical event causing a major supply disruption for LNG is a massive fundamental bullish driver that absolutely overrides such a weak technical setup. **DO NOT SHORT THIS; the macro fundamentals here scream upward pressure.**",
+  "generated_at": "2026-04-28T10:16:04.633901+00:00",
+  "model": "gemini-2.5-flash"
+}

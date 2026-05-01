@@ -1,0 +1,15 @@
+{
+  "symbol": "HG=F",
+  "signal_date": "2026-04-30",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "entry_level": 5.961,
+  "stop_loss": 5.8121,
+  "take_profit": 6.2587,
+  "risk_pct": 1.5,
+  "rationale": "While the technical consensus is weak, the price action shows the close above both fast and slow SMAs, indicating an upward trend. Crucially, news linking copper demand to high-growth tech and satellite infrastructure provides a strong fundamental catalyst. Despite high retail long sentiment (which could be a contrarian signal), the positive fundamental outlook and existing bullish technical trend support a long position.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-30T15:07:07.686373+00:00",
+  "model": "gemini-2.5-flash"
+}

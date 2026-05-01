@@ -1,0 +1,8 @@
+{
+  "symbol": "^NDX",
+  "signal_date": "2026-04-30",
+  "signal": 0,
+  "explanation": "This SHORT signal is dead on arrival. The technicals are a mess: while the RSI is screaming overbought at 70.9, suggesting a pullback, the system itself has 0/100 confidence, and *zero* out of six independent strategies agree. This indicates extreme disagreement internally, making any single indicator like RSI unreliable on its own.\n\nThe key market-moving information is the *robust earnings from the Magnificent 7 and surging AI optimism*, directly pushing the Nasdaq higher, as highlighted by \"Nasdaq bounces back\" and \"Nasdaq 100 futures were up 0.7%.\" Elevated oil prices and upcoming Fed decisions are broader market concerns, but they are clearly overshadowed by tech-specific tailwinds.\n\nThe news definitively *challenges* this weak technical SHORT signal. Strong fundamental drivers from Big Tech earnings and AI demand are actively propelling the NASDAQ 100 upward. Given the complete lack of technical conviction and overwhelming positive fundamental news, this signal is a clear fade; current market conditions strongly favor upside, not a short entry.",
+  "generated_at": "2026-04-30T15:09:19.376265+00:00",
+  "model": "gemini-2.5-flash"
+}

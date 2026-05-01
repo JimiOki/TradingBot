@@ -1,0 +1,15 @@
+{
+  "symbol": "^FTSE",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 10269.16,
+  "stop_loss": 10425.0,
+  "take_profit": 10086.0,
+  "risk_pct": 1.5,
+  "rationale": "The FTSE 100 closed below its Fast and Slow SMAs with RSI indicating weak momentum, suggesting a bearish technical trend. News headlines emphasize significant macroeconomic headwinds, including the Iran war, impending rate decisions, and weak Chinese trade data impacting commodity prices, which collectively outweigh positive individual stock earnings. Given the clear bearish technicals and strong negative macro catalysts, a short position is favored.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T09:23:29.383788+00:00",
+  "model": "gemini-2.5-flash"
+}

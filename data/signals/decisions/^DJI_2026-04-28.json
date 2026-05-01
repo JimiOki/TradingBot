@@ -1,0 +1,15 @@
+{
+  "symbol": "^DJI",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "entry_level": 49141.93,
+  "stop_loss": 48269.24,
+  "take_profit": 50887.31,
+  "risk_pct": 1.5,
+  "rationale": "The Dow Jones exhibits a bullish trend with the close well above its SMAs and a healthy RSI, suggesting underlying strength. Although most strategy indicators are neutral, the relative resilience of Dow futures post-market pullback, despite tech-led concerns, indicates potential for further upside. This trade follows the established trend, using the suggested R/R.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T01:04:50.883243+00:00",
+  "model": "gemini-2.5-flash"
+}

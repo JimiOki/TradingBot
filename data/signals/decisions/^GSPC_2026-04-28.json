@@ -1,0 +1,15 @@
+{
+  "symbol": "^GSPC",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "llm_recommendation": "NO_GO",
+  "direction": null,
+  "entry_level": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "risk_pct": null,
+  "rationale": "While the S&P 500 shows a strong bullish technical trend with the Close significantly above SMAs and an EMA crossover signal, the overall technical consensus from independent strategies is very weak (1 of 6). Crucially, the market faces significant event risk with upcoming Magnificent Seven earnings and a Federal Reserve meeting, compounded by recent concerns over AI spending that led to a dip in tech. This high uncertainty and weak technical conviction override the bullish trend for now, warranting a NO_GO decision.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T01:03:15.724133+00:00",
+  "model": "gemini-2.5-flash"
+}

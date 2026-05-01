@@ -1,0 +1,15 @@
+{
+  "symbol": "^FTSE",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 10364.29,
+  "stop_loss": 10470.0,
+  "take_profit": 10178.0,
+  "risk_pct": 1.5,
+  "rationale": "The FTSE 100 is exhibiting technical weakness with the close below the fast SMA and RSI below 50. While strategy signals are mostly neutral with a single weak long, recent news highlights significant negative pressure on the index due to weak trade data from China and broader global economic uncertainties, driving the FTSE 100 lower. This macro sentiment, combined with the mild technical bearishness, supports a SHORT position.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-28T10:17:03.475033+00:00",
+  "model": "gemini-2.5-flash"
+}

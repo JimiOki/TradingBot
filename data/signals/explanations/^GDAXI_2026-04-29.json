@@ -1,0 +1,8 @@
+{
+  "symbol": "^GDAXI",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "explanation": "This SHORT signal is an absolute mess on the technical front. The close is *above* both the 20 and 50 SMAs, which is a bullish setup, not bearish, and completely contradicts the signal's direction. With only 1 out of 6 strategies agreeing and the EMA Crossover explicitly LONG, the 50/100 confidence and \"no conflicting indicators\" claim are simply laughable.\n\nHowever, the news provides a consistently grim macro backdrop for the DAX, highlighting \"geopolitical tensions and economic uncertainties\" as drivers for \"significant drops\" and \"headwinds\" across European markets. The U.S.-Iran war pushing oil higher further reinforces this negative outlook, creating broad fundamental pressure.\n\nWhile the *technical entry logic* for this specific signal is completely flawed, the prevailing macro news unequivocally *reinforces* a bearish bias for the DAX. The clear fundamental headwinds carry significantly more weight than these weak, contradictory technical indicators; if you're taking a short, it's on macro conviction, not this garbage signal.",
+  "generated_at": "2026-04-29T09:24:14.170872+00:00",
+  "model": "gemini-2.5-flash"
+}

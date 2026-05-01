@@ -1,0 +1,8 @@
+{
+  "symbol": "NG=F",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "explanation": "This SHORT signal for NG=F at 2.6800 looks flimsy, to be direct. The technical picture is weak; while the price is below the 50-day SMA, indicating a longer-term downtrend, the close is *above* the 20-day SMA, suggesting some short-term support. More critically, only 1 of 6 independent strategies agrees, which torpedoes the stated \"75/100\" confidence.\n\nRegarding news, the heavily LONG-biased IG client sentiment (85% long) is the *only* real market-moving data point that aligns with a contrarian SHORT view. Woodside's production hit due to weather is an *external, mildly bullish* supply disruption, not supporting a short, and the other news about individual stocks or jet fuel is largely irrelevant noise for NG=F futures.\n\nTherefore, the news *barely* reinforces this short, relying heavily on a contrarian sentiment read. Given the extremely weak technical consensus, I'd give the lack of internal system agreement far more weight; this signal lacks conviction and strong fundamental backing beyond a single contrarian indicator. I'd pass or demand more validation before touching it.",
+  "generated_at": "2026-04-29T09:22:35.622947+00:00",
+  "model": "gemini-2.5-flash"
+}

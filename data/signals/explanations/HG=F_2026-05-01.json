@@ -1,0 +1,8 @@
+{
+  "symbol": "HG=F",
+  "signal_date": "2026-05-01",
+  "signal": 0,
+  "explanation": "This signal for a Copper short is severely flawed and should be disregarded. The technical picture is contradictory: price is trading *above* its fast SMA, the RSI is neutral-to-mildly bullish, and only 1 out of 6 strategies actually agrees with the short direction, making the stated 75% confidence entirely unsupported. Furthermore, the Stop Loss and Take Profit values are incorrectly assigned for a short trade with a 2.0x R/R, indicating a fundamental error in the signal generation.\n\nThe news identifies strong fundamental drivers for Copper, predominantly to the upside. Teck Resources reported record quarterly copper sales due to strong commodity prices, and Freeport-McMoRan posted robust results driven by elevated copper prices, with future production concerns at Grasberg potentially tightening supply, which is bullish for the metal itself. Rio Tinto also anticipates higher recoveries at its Oyu Tolgoi copper mine. The only potential bearish factor is the heavily skewed IG client sentiment (88% long), which serves as a contrarian indicator.\n\nThe news overwhelmingly *challenges* this weak technical SHORT signal. While the contrarian IG sentiment might suggest a pullback, the strong fundamental performance and positive outlook from major miners, combined with the outright poor and conflicting technicals, mean the fundamentals carry far more weight here. Trying to short Copper with this setup would be gambling against clear market strength and a completely unreliable signal.",
+  "generated_at": "2026-05-01T06:44:29.322900+00:00",
+  "model": "gemini-2.5-flash"
+}

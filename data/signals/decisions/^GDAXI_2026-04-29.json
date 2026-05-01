@@ -1,0 +1,15 @@
+{
+  "symbol": "^GDAXI",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 23952.3203,
+  "stop_loss": 24533.98,
+  "take_profit": 22789.0,
+  "risk_pct": 2.0,
+  "rationale": "Technicals show a very weak bullish bias with only 1 of 6 strategies indicating LONG and the close slightly above fast SMA. However, recent news consistently highlights significant declines in the DAX due to geopolitical tensions and economic uncertainties, presenting a strong bearish macro catalyst. This fundamental driver outweighs the weak technical signals and mildly long-biased IG client sentiment, justifying a short position with a moderate conviction.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T09:24:36.634644+00:00",
+  "model": "gemini-2.5-flash"
+}

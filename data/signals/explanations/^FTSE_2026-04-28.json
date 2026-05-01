@@ -1,0 +1,8 @@
+{
+  "symbol": "^FTSE",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "explanation": "This SHORT signal is dead on arrival. While the price closed below both its 20 and 50-day SMAs with bearish RSI momentum, the provided Stop Loss and Take Profit levels are **inverted**, configured for a LONG trade, which fundamentally invalidates the entire signal setup. Adding to this shambles, confidence is a mediocre 50/100, and the strategy consensus is non-existent, with the only \"agreeing\" indicator (EMA Crossover) actually signalling LONG, directly contradicting the proposed SHORT.\n\nFundamentally, the news consistently points to bearish pressure on the FTSE 100, citing weak trade data from China and broader global economic uncertainties as key drivers for downward movement. Despite the news narrative strongly reinforcing a general bearish bias for the index, this specific technical signal is fatally flawed and utterly untradable due to its internal contradictions and, most critically, the incorrect risk management parameters. Scrap this signal; it's broken.",
+  "generated_at": "2026-04-28T10:16:50.369568+00:00",
+  "model": "gemini-2.5-flash"
+}

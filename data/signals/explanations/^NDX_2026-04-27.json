@@ -1,0 +1,8 @@
+{
+  "symbol": "^NDX",
+  "signal_date": "2026-04-27",
+  "signal": 0,
+  "explanation": "This short signal is weak, based purely on an overbought RSI (72.9) and extreme extension (6.7% above SMA) which suggest mean reversion, yet the system itself has *zero confidence* and *not a single other strategy agrees*. This is a conviction-less call from the technical side.\n\nThe news, however, paints a picture of *extreme tech strength*. NASDAQ just hit record highs on its longest winning streak in years, fueled by massive earnings beats from AI players like Intel. While US-Iran tensions introduce some geopolitical risk and caused a minor futures dip, this is noise against the backdrop of powerful fundamental bullish momentum.\n\nThis news *completely obliterates* the short technical signal. You're trying to short a market that's at record highs, breaking out on strong earnings, and has immense momentum. Basic overbought technicals mean nothing when underlying fundamentals are roaring, overriding simple mean-reversion plays or minor geopolitical jitters. This short is a fade-out.",
+  "generated_at": "2026-04-27T15:18:19.471647+00:00",
+  "model": "gemini-2.5-flash"
+}

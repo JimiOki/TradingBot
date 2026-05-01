@@ -1,0 +1,15 @@
+{
+  "symbol": "SI=F",
+  "signal_date": "2026-04-28",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 73.575,
+  "stop_loss": 78.2714,
+  "take_profit": 64.1822,
+  "risk_pct": 2.0,
+  "rationale": "The technical picture for Silver is bearish, with the price trading significantly below both its Fast and Slow SMAs, and supported by MACD and EMA Crossover 'SHORT' signals. This bearish trend is strongly reinforced by recent news indicating a 3.2% drop in silver prices today, driven by inflation concerns from rising oil prices and a hawkish Bank of Japan, further bolstered by a strengthening dollar. Given the confluence of bearish technicals and strong fundamental catalysts, a short position is warranted.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-28T10:15:12.093935+00:00",
+  "model": "gemini-2.5-flash"
+}

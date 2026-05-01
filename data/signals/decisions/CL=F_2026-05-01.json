@@ -1,0 +1,16 @@
+{
+  "symbol": "CL=F",
+  "signal_date": "2026-05-01",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "order_type": "LIMIT",
+  "entry_level": 103.0,
+  "stop_loss": 95.4202,
+  "take_profit": 127.9396,
+  "risk_pct": 2.5,
+  "rationale": "Crude oil is in a strong uptrend, trading well above its SMAs with a bullish RSI. Overwhelmingly bullish news driven by the ongoing Iran conflict, Strait of Hormuz closure, and US blockade indicates severe supply disruptions and has propelled prices higher. While the technical strategy consensus is weak, the robust geopolitical catalysts and clear price action warrant a long position, utilizing a limit order to capture a better risk/reward on a potential pullback.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-05-01T06:43:27.402619+00:00",
+  "model": "gemini-2.5-flash"
+}

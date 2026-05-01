@@ -1,0 +1,16 @@
+{
+  "symbol": "NG=F",
+  "signal_date": "2026-05-01",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "order_type": "MARKET",
+  "entry_level": 2.809,
+  "stop_loss": 2.65,
+  "take_profit": 3.1,
+  "risk_pct": 2.0,
+  "rationale": "The critical news of Europe's second energy crisis, triggered by Strait of Hormuz disruptions and critically low gas storage, presents a very strong bullish catalyst for Natural Gas. Despite weak technical signals and high retail long sentiment, the magnitude of this fundamental supply-side shock justifies entering a long position now. The target aims for a break above the slow SMA, with a stop set below the fast SMA.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-05-01T06:45:35.685587+00:00",
+  "model": "gemini-2.5-flash"
+}

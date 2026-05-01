@@ -1,0 +1,16 @@
+{
+  "symbol": "SI=F",
+  "signal_date": "2026-05-01",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "order_type": "MARKET",
+  "entry_level": 74.12,
+  "stop_loss": 78.4774,
+  "take_profit": 65.4053,
+  "risk_pct": 1.5,
+  "rationale": "The technical picture for Silver is bearish, with price trading 2.5% below the fast SMA and an EMA Crossover signal confirming a short direction. This is supported by the strong contrarian IG client sentiment, which is 82% long. Despite some safe-haven news for precious metals, specific reports highlight silver's struggles, reinforcing a bearish outlook.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-05-01T06:43:59.011379+00:00",
+  "model": "gemini-2.5-flash"
+}

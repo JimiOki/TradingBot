@@ -1,0 +1,15 @@
+{
+  "symbol": "^GSPC",
+  "signal_date": "2026-04-30",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "entry_level": 7161.33,
+  "stop_loss": 7048.45,
+  "take_profit": 7387.07,
+  "risk_pct": 2.0,
+  "rationale": "The S&P 500 exhibits a strong bullish technical trend, with the close significantly above its fast and slow SMAs and a healthy RSI. Recent news indicates continued positive market sentiment driven by strong earnings, AI optimism, and a positive reaction to inflation data, with the S&P 500 still posting gains. While the technical strategy consensus is weak, the underlying trend and news catalysts support a long position with a favorable risk/reward.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-30T15:08:54.135034+00:00",
+  "model": "gemini-2.5-flash"
+}

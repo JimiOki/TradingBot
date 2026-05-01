@@ -1,0 +1,16 @@
+{
+  "symbol": "GC=F",
+  "signal_date": "2026-05-01",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "order_type": "MARKET",
+  "entry_level": 4604.3999,
+  "stop_loss": 4743.8496,
+  "take_profit": 4325.5006,
+  "risk_pct": 1.5,
+  "rationale": "Gold is in a technical downtrend, trading below its fast and slow SMAs, and is on track for a weekly loss. The prospect of 'higher-for-longer' interest rates due to oil-driven inflation concerns provides a strong fundamental headwind, increasing the opportunity cost of holding non-yielding assets. Furthermore, heavily biased long retail sentiment (76%) suggests a contrarian short entry.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-05-01T06:42:49.785454+00:00",
+  "model": "gemini-2.5-flash"
+}

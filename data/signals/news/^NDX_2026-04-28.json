@@ -1,0 +1,44 @@
+[
+  {
+    "title": "IG client sentiment: 44% long / 56% short (SHORT-biased)",
+    "source": "IG Client Sentiment",
+    "timestamp": "",
+    "long_pct": 44.0,
+    "short_pct": 56.0
+  },
+  {
+    "title": "Stock market today: S&P 500, Nasdaq, Dow futures inch up ahead of Mag 7 earnings, last Powell term meeting",
+    "source": "Yahoo Finance",
+    "timestamp": "2026-04-28",
+    "url": "https://finance.yahoo.com/markets/stocks/live/stock-market-today-wednesday-april-29-dow-nasdaq-sp-futures-powell-mag7-231405065.html",
+    "body": "Oops, something went wrong US stock futures hit pause on Wednesday as investors braced for a wave of Big Tech earnings and for what could be Jerome Powell\u2019s final interest-rate announcement as Federal Reserve chair. Contracts on the S&P 500 ( ES=F ) and the Dow Jones Industrial Average ( YM=F ) were little changed. Nasdaq 100 ( NQ=F ) edged up 0.2% after stocks on Wall Street pulled back from record highs on Tuesday. Technology stocks led that decline following a report by The Wall Street Journal that OpenAI missed internal targets for revenue and user growth . Shares in its partner Oracle ( ORCL ) fell 4%, while chipmakers Broadcom ( AVGO ) and Nvidia ( NVDA ) dropped 4% and more than 1%, respectively. That puts the spotlight on Wednesday\u2019s earnings from four members of the \u201cMagnificent"
+  },
+  {
+    "title": "Stocks Fall on AI Jitters and Surging Crude Oil Prices",
+    "source": "Barchart",
+    "timestamp": "2026-04-28",
+    "url": "https://www.barchart.com/story/news/1571176/stocks-fall-on-ai-jitters-and-surging-crude-oil-prices",
+    "body": "All information and data in this article is solely for informational purposes. For more information please view the Barchart Disclosure Policy here Share The S&P 500 Index ( $SPX ) ( SPY ) on Tuesday closed down -0.49%, the Dow Jones Industrial Average ( $DOWI ) ( DIA ) closed down -0.05%, and the Nasdaq 100 Index ( $IUXX ) ( QQQ ) closed down -1.01%. June E-mini S&P futures ( ESM26 ) fell -0.46%, and June E-mini Nasdaq futures ( NQM26 ) fell -0.94%. Stock indexes settled lower on Tuesday, led by losses in technology stocks amid concerns that the massive investment in artificial intelligence will not pay off. The Wall Street Journal reported that OpenAI recently failed to meet its goals for new users and sales, undercutting the shares of OpenAI partners and AI infrastructure stocks,"
+  },
+  {
+    "title": "Top Cryptocurrencies Mixed; Bitcoin Holds Above $76,000 Level",
+    "source": "MT Newswires",
+    "timestamp": "2026-04-28",
+    "url": "https://finance.yahoo.com/markets/crypto/articles/top-cryptocurrencies-mixed-bitcoin-holds-195714812.html",
+    "body": "Oops, something went wrong Major digital assets were mixed Tuesday, with Bitcoin (BTC-USD) lower but holding above the $76,000"
+  },
+  {
+    "title": "AI Spending Fears Hit Tech Stocks As S&P 500 Pulls Back From Record",
+    "source": "GuruFocus.com",
+    "timestamp": "2026-04-28",
+    "url": "https://finance.yahoo.com/markets/stocks/articles/ai-spending-fears-hit-tech-182045151.html",
+    "body": "Oops, something went wrong This article first appeared on GuruFocus . US stocks pulled back on Tuesday, with the S&P 500 Index ( SPY ) slipping 0.7% from its record level by midday in New York, as renewed questions around artificial intelligence spending began to weigh on sentiment. The Nasdaq 100 Index dropped more than 1%, while chipmakers Nvidia Corp. and Broadcom Inc. were among the biggest drags. The move followed a report that OpenAI missed internal targets for user growth and sales over several months, raising concerns internally about its ability to sustain elevated AI infrastructure spending. Stocks tied to that ecosystem, including CoreWeave Inc. and Oracle Corp., fell more than 3% even as OpenAI pushed back against the narrative. Is SPY fairly valued? Test your thesis with our"
+  },
+  {
+    "title": "Trump Says He Has 'All The Cards' As Iran Talks Halt: Brent Crude Jumps To $107, Dow Futures Slip 52 Points",
+    "source": "Benzinga",
+    "timestamp": "2026-04-28",
+    "url": "https://finance.yahoo.com/markets/commodities/articles/trump-says-cards-iran-talks-163108572.html",
+    "body": "Oops, something went wrong Late Sunday, oil prices surged and stock futures traded mixed amid rising U.S.-Iran tensions and a widening maritime standoff. Dow futures fell 52.00 points, or 0.11%, to 49,340.00, while S&P 500 futures gained 6.00 points, or 0.08%, to 7,200.75 and Nasdaq 100 futures advanced 74.00 points, or 0.27% as of 9:38 p.m. EDT. In commodities, WTI crude oil rose 1.50% to $95.82 per barrel, while Brent crude climbed 1.66% to $107.08 per barrel. RBOB gasoline futures increased 1.08% to $3.50 per gallon, while natural gas futures edged up 0.20% to $2.528 per MMBtu. ULSD heating oil also moved higher, rising 2.98% to $4.0034 per gallon. Don't Miss: A single bad hire can set a startup back years. Here are the 5 hires founders most often misjudge \u2014 and why Still Learning the"
+  }
+]

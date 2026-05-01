@@ -1,0 +1,15 @@
+{
+  "symbol": "^N225",
+  "signal_date": "2026-04-30",
+  "signal": 0,
+  "llm_recommendation": "NO_GO",
+  "direction": null,
+  "entry_level": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "risk_pct": null,
+  "rationale": "The technical evidence is incomplete with critical data points like Close price, SMAs, and suggested stop/target being 'nan', making it impossible to define actionable trade parameters. While recent news suggests underlying strength in Japan's tech sector (Citi report), current daily sentiment is negative due to oil and interest rates. Given the lack of fundamental technical data for trade construction and mixed immediate news, a responsible trade cannot be placed.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-30T15:10:51.999121+00:00",
+  "model": "gemini-2.5-flash"
+}

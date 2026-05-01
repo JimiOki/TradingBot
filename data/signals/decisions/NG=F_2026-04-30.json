@@ -1,0 +1,15 @@
+{
+  "symbol": "NG=F",
+  "signal_date": "2026-04-30",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 2.687,
+  "stop_loss": 2.8846,
+  "take_profit": 2.2918,
+  "risk_pct": 1.5,
+  "rationale": "The technical picture is mixed to weakly bearish, with the close below the slow SMA and one strategy signaling SHORT. However, the strong contrarian IG client sentiment (86% long) provides a compelling signal for a short position, reinforced by recent news of declining energy stocks and sinking oil prices which suggest broader energy sector weakness.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-30T15:07:40.885309+00:00",
+  "model": "gemini-2.5-flash"
+}

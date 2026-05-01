@@ -1,0 +1,16 @@
+{
+  "symbol": "^N225",
+  "signal_date": "2026-05-01",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "order_type": "MARKET",
+  "entry_level": 59509.5586,
+  "stop_loss": 57804.4525,
+  "take_profit": 62919.7708,
+  "risk_pct": 2.5,
+  "rationale": "The Nikkei 225 exhibits a strong uptrend, with price significantly above both SMAs and an EMA Crossover signaling long. Strong news catalysts, including surging Tokyo Electron shares due to AI demand and Citi's view of no overheating in the tech sector, provide robust fundamental support for continued upside, outweighing the 'extended' price position. This points to sustained momentum.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-05-01T06:46:51.411195+00:00",
+  "model": "gemini-2.5-flash"
+}

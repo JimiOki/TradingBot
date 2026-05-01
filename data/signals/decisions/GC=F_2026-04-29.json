@@ -1,0 +1,15 @@
+{
+  "symbol": "GC=F",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 4585.3,
+  "stop_loss": 4727.03,
+  "take_profit": 4301.84,
+  "risk_pct": 2.5,
+  "rationale": "Gold is in a clear downtrend, trading below its fast and slow SMAs, and the RSI indicates bearish momentum. Despite weak consensus from automated strategies, powerful fundamental catalysts like elevated interest rate expectations due to inflation and upcoming hawkish Fed remarks are driving prices lower. This strong bearish sentiment is further supported by a contrarian signal from IG client sentiment, where a large majority are long, indicating potential for further downside.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T09:20:08.080404+00:00",
+  "model": "gemini-2.5-flash"
+}

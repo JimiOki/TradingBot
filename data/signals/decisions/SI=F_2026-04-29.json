@@ -1,0 +1,15 @@
+{
+  "symbol": "SI=F",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 73.26,
+  "stop_loss": 77.5917,
+  "take_profit": 64.5966,
+  "risk_pct": 2.0,
+  "rationale": "The technicals indicate a bearish trend with the close below both SMAs and a bearish RSI, although the strategy consensus is weak. Critically, recent news shows silver plunging due to inflation concerns and elevated interest rate expectations ahead of Fed remarks, providing a strong fundamental catalyst. This bearish outlook is further supported by the overwhelmingly long IG client sentiment (83%), acting as a contrarian signal for a short position.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T09:21:15.129547+00:00",
+  "model": "gemini-2.5-flash"
+}

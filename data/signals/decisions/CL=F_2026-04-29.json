@@ -1,0 +1,15 @@
+{
+  "symbol": "CL=F",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "LONG",
+  "entry_level": 103.52,
+  "stop_loss": 92.5183,
+  "take_profit": 125.5234,
+  "risk_pct": 2.5,
+  "rationale": "The market shows a strong bullish technical trend, with Close significantly above the fast SMA and RSI supporting upward momentum. Crucially, news consistently points to the ongoing Iran conflict driving oil prices higher, overriding the weak technical consensus and creating a powerful macro catalyst for a long position.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T09:20:42.875475+00:00",
+  "model": "gemini-2.5-flash"
+}

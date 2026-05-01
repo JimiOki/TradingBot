@@ -6,3 +6,10 @@ __pycache__/
 logs/
 data/raw/
 data/tmp/
+data/curated/
+*.parquet
+*.coverage
+.coverage
+*.png
+*.drawio.bkp
+src/trading_lab.egg-info/

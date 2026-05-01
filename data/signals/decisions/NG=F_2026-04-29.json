@@ -1,0 +1,15 @@
+{
+  "symbol": "NG=F",
+  "signal_date": "2026-04-29",
+  "signal": 0,
+  "llm_recommendation": "GO",
+  "direction": "SHORT",
+  "entry_level": 2.68,
+  "stop_loss": 2.8799,
+  "take_profit": 2.2802,
+  "risk_pct": 1.5,
+  "rationale": "The technical picture shows a weak short signal from the EMA crossover and the price trading below the slow SMA, despite being slightly above the fast SMA. The most significant factor is the strong contrarian IG client sentiment, with 85% of traders long, which often precedes a price decline. The news is largely neutral, with some mixed signals on supply/demand, reinforcing a short position against prevailing retail sentiment.",
+  "conflicts_with_technical": false,
+  "generated_at": "2026-04-29T09:22:46.988583+00:00",
+  "model": "gemini-2.5-flash"
+}
