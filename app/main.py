@@ -40,6 +40,7 @@ from trading_lab.paths import SIGNALS_DATA_DIR
 SNAPSHOT_PATH = SIGNALS_DATA_DIR / "portfolio_snapshot.parquet"
 
 dashboard = st.Page("pages/dashboard.py", title="Dashboard", icon="📊", default=True)
+trade_journal = st.Page("pages/trade_journal.py", title="Trade Journal", icon="📒")
 charts = st.Page("pages/charts.py", title="Charts", icon="📈")
 backtests = st.Page("pages/backtests.py", title="Backtests", icon="🔬")
 settings = st.Page("pages/settings.py", title="Settings", icon="⚙️")
@@ -48,7 +49,7 @@ settings = st.Page("pages/settings.py", title="Settings", icon="⚙️")
 # Navigation
 # ---------------------------------------------------------------------------
 
-pg = st.navigation([dashboard, charts, backtests, settings])
+pg = st.navigation([dashboard, trade_journal, charts, backtests, settings])
 
 # ---------------------------------------------------------------------------
 # Sidebar — REQ-UI-001
