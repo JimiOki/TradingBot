@@ -305,6 +305,10 @@ def process_instrument_multi(
         else:
             row[col] = primary_last.get(col) if col in primary_last.index else None
 
+    # Persist individual strategy signals as columns (sig_<strategy_name>)
+    for strat_key, sig_val in strategy_signals.items():
+        row[f"sig_{strat_key}"] = sig_val
+
     # Audit entry for the generated signal (REQ-OPS-001)
     log_event(
         AuditAction.SIGNAL_GENERATED,

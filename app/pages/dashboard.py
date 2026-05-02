@@ -175,6 +175,78 @@ def load_decision(symbol: str, date_str: str) -> dict | None:
         return None
 
 
+def load_positions_snapshot() -> list[dict]:
+    """Read the positions snapshot saved by execute_trades.py. Returns [] if absent."""
+    path = SIGNALS_DATA_DIR / "positions_snapshot.json"
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def load_sr_and_volume(symbol: str) -> dict:
+    """Load S/R levels and volume ratio from curated data."""
+    result: dict = {"support_levels": None, "resistance_levels": None, "volume_ratio": None}
+    matches = list(CURATED_DATA_DIR.glob(f"{symbol.lower()}_*.parquet"))
+    if not matches:
+        return result
+    try:
+        bars = pd.read_parquet(matches[0])
+        if len(bars) < 5:
+            return result
+        close_col = "close" if "close" in bars.columns else "Close"
+        high_col = "High" if "High" in bars.columns else "high"
+        low_col = "Low" if "Low" in bars.columns else "low"
+        vol_col = "Volume" if "Volume" in bars.columns else "volume"
+
+        current_close = float(bars[close_col].iloc[-1])
+        recent = bars.tail(60)
+
+        # Swing levels
+        if high_col in recent.columns and low_col in recent.columns:
+            highs = recent[high_col].tolist()
+            lows = recent[low_col].tolist()
+            from trading_lab.features.indicators import find_swing_levels
+            swing_highs, swing_lows = find_swing_levels(highs, lows, window=2)
+            resistance = sorted([h for h in swing_highs if h > current_close])[:3]
+            support = sorted([s for s in swing_lows if s < current_close], reverse=True)[:3]
+            result["resistance_levels"] = resistance if resistance else None
+            result["support_levels"] = support if support else None
+
+        # Volume ratio
+        if vol_col in bars.columns and len(bars) >= 20:
+            vol_series = bars[vol_col].tail(20)
+            avg_vol = vol_series.mean()
+            latest_vol = bars[vol_col].iloc[-1]
+            if avg_vol and avg_vol > 0:
+                result["volume_ratio"] = round(float(latest_vol / avg_vol), 2)
+    except Exception:
+        pass
+    return result
+
+
+def load_recent_activity() -> pd.DataFrame | None:
+    """Read the execution log and return only the most recent run's rows.
+
+    Returns None if the file doesn't exist or is empty.
+    """
+    path = SIGNALS_DATA_DIR / "execution_log.parquet"
+    if not path.exists():
+        return None
+    try:
+        df = pd.read_parquet(path)
+        if df.empty:
+            return None
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        latest_ts = df["timestamp"].max()
+        subset = df[df["timestamp"] == latest_ts]
+        return subset if not subset.empty else None
+    except Exception:
+        return None
+
+
 def load_session_status(symbol: str, date_str: str) -> bool | None:
     """Read session_open from a persisted MarketContext JSON. Returns None if absent."""
     path = SIGNALS_DATA_DIR / f"market_context_{symbol}_{date_str}.json"
@@ -360,6 +432,93 @@ def _render_refresh_section() -> None:
         st.rerun()
 
 
+def _render_positions_panel() -> None:
+    """Render open positions with LLM management decisions."""
+    positions = load_positions_snapshot()
+    if not positions:
+        return
+
+    st.subheader(f"Open Positions ({len(positions)})")
+    for pos in positions:
+        symbol = pos.get("symbol", "?")
+        direction = pos.get("direction", "?")
+        entry = pos.get("entry_level", 0)
+        current = pos.get("current_level", 0)
+        pnl = pos.get("pnl", 0)
+        stop = pos.get("stop_level")
+        limit = pos.get("limit_level")
+        size = pos.get("size", 0)
+        name = pos.get("instrument_name", symbol)
+        decision = pos.get("position_decision", {})
+        rec = decision.get("recommendation", "UNKNOWN")
+        rationale = decision.get("rationale", "")
+
+        dir_colour = "green" if direction == "BUY" else "red"
+        pnl_colour = "green" if pnl >= 0 else "red"
+        rec_colour = {"HOLD": "green", "ADJUST": "orange", "CLOSE": "red"}.get(rec, "grey")
+
+        header = (
+            f"**{symbol}** — {name} &nbsp;|&nbsp; "
+            f":{dir_colour}[{direction}] &nbsp; "
+            f":{pnl_colour}[£{pnl:+.2f}] &nbsp; "
+            f":{rec_colour}[{rec}]"
+        )
+
+        with st.expander(header, expanded=(rec != "HOLD")):
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.metric("Direction", direction)
+            c2.metric("Entry", _fmt_price(entry))
+            c3.metric("Current", _fmt_price(current))
+            c4.metric("P&L", f"£{pnl:+.2f}")
+            c5.metric("Size", f"£{size}/pt")
+
+            c6, c7 = st.columns(2)
+            c6.metric("Stop", _fmt_price(stop) if stop else "—")
+            c7.metric("Target", _fmt_price(limit) if limit else "—")
+
+            if rationale:
+                st.markdown(f"**{rec}** — {rationale}")
+
+
+def _render_recent_activity() -> None:
+    """Show a compact summary of the most recent execution run."""
+    activity = load_recent_activity()
+    if activity is None or activity.empty:
+        return
+
+    latest_ts = activity["timestamp"].iloc[0]
+    ts_label = latest_ts.strftime("%Y-%m-%d %H:%M UTC")
+
+    st.subheader(f"Last Run \u2014 {ts_label}")
+
+    # Summary counts by action
+    action_counts = activity["action"].value_counts()
+    parts = [f"{count} {action.lower()}" for action, count in action_counts.items()]
+    st.caption(" | ".join(parts))
+
+    # Compact table
+    display_cols = ["symbol", "action", "direction", "entry_level", "current_price", "unrealised_pnl"]
+    available = [c for c in display_cols if c in activity.columns]
+    display_df = activity[available].copy()
+
+    column_config = {
+        "symbol": st.column_config.TextColumn("Symbol"),
+        "action": st.column_config.TextColumn("Action"),
+        "direction": st.column_config.TextColumn("Direction"),
+        "entry_level": st.column_config.NumberColumn("Entry", format="%.4f"),
+        "current_price": st.column_config.NumberColumn("Current", format="%.4f"),
+        "unrealised_pnl": st.column_config.NumberColumn("Unreal. P&L", format="%.2f"),
+    }
+    config = {k: v for k, v in column_config.items() if k in available}
+
+    st.dataframe(
+        display_df.reset_index(drop=True),
+        column_config=config,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 def _render_signal_table(df: pd.DataFrame) -> None:
     """REQ-UI-002 + quality/risk overlays — main signal table."""
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -449,6 +608,39 @@ def _render_signal_table(df: pd.DataFrame) -> None:
                 badges.append(":red[🔴 HIGH VOLATILITY]")
             if badges:
                 st.markdown("  &nbsp;".join(badges))
+
+            # Strategy signal breakdown
+            _STRATEGY_DISPLAY = {
+                "sma_cross": "EMA",
+                "macd_cross": "MACD",
+                "bollinger_breakout": "Boll BK",
+                "bollinger_reversion": "Boll RV",
+                "donchian": "Donchian",
+                "rsi_reversion": "RSI RV",
+            }
+            sig_parts = []
+            for key, display_name in _STRATEGY_DISPLAY.items():
+                val = row.get(f"sig_{key}")
+                if val is not None and not (isinstance(val, float) and pd.isna(val)):
+                    val = int(val)
+                    if val == 1:
+                        sig_parts.append(f"{display_name}: :green[LONG]")
+                    elif val == -1:
+                        sig_parts.append(f"{display_name}: :red[SHORT]")
+                    else:
+                        sig_parts.append(f"{display_name}: :grey[NEUTRAL]")
+            if sig_parts:
+                st.markdown(" | ".join(sig_parts))
+
+            # Volume & S/R levels
+            sr_vol = load_sr_and_volume(symbol)
+            vol_ratio = sr_vol.get("volume_ratio")
+            support = sr_vol.get("support_levels")
+            resistance = sr_vol.get("resistance_levels")
+            vc1, vc2, vc3 = st.columns(3)
+            vc1.metric("Volume", f"{vol_ratio:.1f}x avg" if vol_ratio else "N/A")
+            vc2.metric("Support", ", ".join(f"{s:.2f}" for s in support) if support else "—")
+            vc3.metric("Resistance", ", ".join(f"{r:.2f}" for r in resistance) if resistance else "—")
 
             # Last updated (REQ-OPS-002)
             ts = row.get("timestamp_of_last_bar")
@@ -609,6 +801,14 @@ def main() -> None:
     if df is not None and not df.empty:
         for warning in compute_correlation_warnings(df, CURATED_DATA_DIR):
             st.warning(f"⚠️ Correlation Risk: {warning['message']}")
+
+    # --- Open Positions panel ---
+    _render_positions_panel()
+
+    # --- Recent Activity (last execution run) ---
+    _render_recent_activity()
+
+    st.divider()
 
     # --- Signal table (REQ-UI-002, REQ-UI-008) ---
     if df is None:

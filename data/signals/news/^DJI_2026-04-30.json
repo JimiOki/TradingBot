@@ -1,44 +1,44 @@
 [
   {
-    "title": "IG client sentiment: 49% long / 51% short (SHORT-biased)",
+    "title": "IG client sentiment: 34% long / 66% short (SHORT-biased)",
     "source": "IG Client Sentiment",
     "timestamp": "",
-    "long_pct": 49.0,
-    "short_pct": 51.0
+    "long_pct": 34.0,
+    "short_pct": 66.0
   },
   {
-    "title": "Stock market today: S&P 500, Nasdaq, Dow futures tick up after gauges close April on record highs",
+    "title": "The stock market just had its best month since the pandemic rebound: Chart of the Day",
     "source": "Yahoo Finance",
-    "timestamp": "2026-04-30",
-    "url": "https://finance.yahoo.com/markets/stocks/live/stock-market-today-friday-may-1-records-apple-iran-231056146.html",
-    "body": "Oops, something went wrong US stock futures ticked higher Friday morning, building on a powerful rally that pushed major indexes to fresh records and capped a standout April for equities. Futures tied to the Dow Jones Industrial Average ( YM=F ) and S&P 500 ( ES=F ) edged up 0.2% and 0.1%, respectively. Nasdaq 100 futures ( NQ=F ) hovered above the baseline. During Thursday\u2019s regular session , stocks surged across the board. The Dow ( ^DJI ) rallied more than 790 points, or 1.6%, while the S&P 500 ( ^GSPC ) climbed just over 1% to close above 7,200 for the first time on record. The Nasdaq Composite ( ^IXIC ) added nearly 0.9% and also reached a new high. In after-hours trading, Apple ( AAPL ) jumped roughly 3% after delivering better-than-expected fiscal second-quarter results . The tech"
+    "timestamp": "2026-05-01",
+    "url": "https://finance.yahoo.com/markets/article/the-stock-market-just-had-its-best-month-since-the-pandemic-rebound-chart-of-the-day-100000062.html",
+    "body": "Oops, something went wrong Stocks knocked it out of the park in April. Wall Street\u2019s April rebound ended the month with a scoreboard that looks more like 2020 than 2026 \u2014 and some of the details look even more like the dot-com era. The S&P 500 ( ^GSPC ) surged over 10% during the month, its best showing since November 2020, while the Nasdaq Composite ( ^IXIC ) jumped more than 15% for its best month since April 2020. The Nasdaq 100 ( ^NDX ) gained nearly 16%, its best month since October 2002. That was not the setup investors had in mind a month ago, with stocks still shaking off the shock of a major war and the bull market suddenly on defense. The rally was broad enough to pull smaller stocks along too. The Russell 2000 ( ^RUT ) climbed more than 12%, also its best month since November"
   },
   {
-    "title": "Dow Jones Futures Rise As Apple Climbs On Earnings, Sandisk Skids; Stock Market At High",
+    "title": "S&P 500, Nasdaq end higher, notch weekly gains",
+    "source": "Reuters Videos",
+    "timestamp": "2026-05-01",
+    "url": "https://finance.yahoo.com/video/p-500-nasdaq-end-higher-223559341.html",
+    "body": "Oops, something went wrong <span>STORY: U.S. stocks ended mostly higher on Friday, with the Dow the only outlier, dipping about three-tenths of a percent, while the S&P 500 gained about three-tenths of a percent and the Nasdaq climbed nine-tenths of a percent.</span><span>Both the S&P 500 and the Nasdaq logged their sixth consecutive week of gains, their longest weekly winning stretches since October of 2024.</span><span>It was a big week for corporate earnings, with five of the Magnificent Seven megacaps reporting.</span><span>Among them, Apple climbed more than 3% on Friday, a day after the tech giant provided a solid sales forecast, touting strong demand for its flagship iPhone 17 and the MacBook Neo.</span><span>Analysts now see overall first-quarter earnings growth of nearly 28%"
+  },
+  {
+    "title": "Dow Jones Futures: Stock Market Hits Highs After Bullish Pause; Apple, Broadcom In Buy Zones",
     "source": "Investor's Business Daily",
     "timestamp": "2026-05-01",
-    "url": "https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-apple-sandisk-roku-earnings/?src=A00220&yptr=yahoo",
-    "body": "BREAKING: Apple Leads Earnings Movers After S&P 500, Nasdaq Hit Highs Dow Jones futures rose slightly early Friday, along with S&P 500 futures and Nasdaq futures. Apple (AAPL), Sandisk (SNDK), Western Digital (WDC) and Roku (ROKU) all beat earnings views after the close. The stock market rally had a solid session with the S&P 500 and Nasdaq hitting new highs amid massive earnings news and crude oil prices pulling back. Google\u2026 11:13 AM ET The Dow Jones index surged 790 points and the S&P 500 and Nasdaq set new highs. Nvidia stock sold off,... 11:13 AM ET The Dow Jones index surged 790 points and the S&P... Get instant access to exclusive stock lists, expert market analysis and powerful tools with 2 months of IBD Digital for only $20! Get market updates, educational videos, webinars, and"
+    "url": "https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-sp-500-apple-broadcom-buy-zones/?src=A00220&yptr=yahoo",
+    "body": "BREAKING: Apple Leads S&P 500, Nasdaq To Fresh Highs Dow Jones futures will open Sunday evening, along with S&P 500 futures and Nasdaq futures. The stock market had a solid week, with the S&P 500 and Nasdaq hitting record highs. Google parent Alphabet (GOOGL) was a big winner, while hyperscalers' strong capital spending forecasts buoyed the AI ecosystem. But the market advance was broad. Apple (AAPL) flashed a buy\u2026 10:35 AM ET The stock market mostly rose, but the Dow Jones index fell Friday. The Nasdaq and S&P 500 hit new highs.... 10:35 AM ET The stock market mostly rose, but the Dow Jones index... Get instant access to exclusive stock lists, expert market analysis and powerful tools with 2 months of IBD Digital for only $20! Get market updates, educational videos, webinars, and stock"
   },
   {
-    "title": "USA Rare Earth (USAR) Climbs 18% \u2014 Here\u2019s What Propelled The Stock",
-    "source": "Insider Monkey",
+    "title": "FedEx (FDX) Stock Dips While Market Gains: Key Facts",
+    "source": "Zacks",
     "timestamp": "2026-05-01",
-    "url": "https://finance.yahoo.com/markets/stocks/articles/usa-rare-earth-usar-climbs-034856747.html",
-    "body": "Oops, something went wrong USA Rare Earth Inc. (NASDAQ:USAR) is one of the 10 Stocks Delivering Eye-Popping Gains. Shares in USA Rare Earth jumped by 17.88 percent on Thursday to close at $25.97 apiece, as investors positioned portfolios in high-growth stocks, supported by a broader market optimism. USA Rare Earth Inc. (NASDAQ:USAR) mirrored the rally in the wider market during the day, with the Dow Jones and the S&P 500 both clocking more than 1 percent gains. The Nasdaq, on the other hand, rose by 0.89 percent. USA Rare Earth's magnet facility in Stillwater, Oklahoma. Photo from the USA Rare Earth website Further buoying sentiment was recent news that it successfully acquired a rare earth miner for $2.8 billion. According to USA Rare Earth Inc. (NASDAQ:USAR) it inked a definitive"
+    "url": "https://finance.yahoo.com/markets/stocks/articles/fedex-fdx-stock-dips-while-221501532.html",
+    "body": "Oops, something went wrong In the latest trading session, FedEx (FDX) closed at $393.73, marking a -2.38% move from the previous day. This move lagged the S&P 500's daily gain of 0.29%. At the same time, the Dow lost 0.31%, and the tech-heavy Nasdaq gained 0.89%. Prior to today's trading, shares of the package delivery company had gained 11.53% outpaced the Transportation sector's gain of 8.95% and the S&P 500's gain of 10.54%. The investment community will be paying close attention to the earnings performance of FedEx in its upcoming release. It is anticipated that the company will report an EPS of $5.8, marking a 4.45% fall compared to the same quarter of the previous year. Alongside, our most recent consensus estimate is anticipating revenue of $23.86 billion, indicating a 7.38% upward"
   },
   {
-    "title": "Lightwave Logic (LWLG) Soars 16.7% on AI Boom",
-    "source": "Insider Monkey",
+    "title": "AngloGold Ashanti (AU) Stock Drops Despite Market Gains: Important Facts to Note",
+    "source": "Zacks",
     "timestamp": "2026-05-01",
-    "url": "https://finance.yahoo.com/markets/stocks/articles/lightwave-logic-lwlg-soars-16-034416164.html",
-    "body": "Oops, something went wrong Lightwave Logic Inc. (NASDAQ:LWLG) is one of the 10 Stocks Delivering Eye-Popping Gains. Lightwave rallied for a second day on Thursday, climbing 16.67 percent to finish at $13.72 apiece, as investors increased their exposure in high-growth stocks, with sentiment remaining fueled by the booming AI. The stock also mirrored the rally on Wall Street\u2019s indices, with the Dow Jones and the S&P 500 clocking more than 1 percent gains. The Nasdaq, on the other hand, increased by 0.89 percent. Photo by George Morina on PexelsPhoto by George Morina on Pexels In recent news, Lightwave Logic Inc. (NASDAQ:LWLG) announced that its high-speed modulator platform was made available as part of the GDSFactory process design kit, which GlobalFoundries uses for its silicon photonics"
-  },
-  {
-    "title": "Review & Preview: Partying Like It\u2019s 2020",
-    "source": "Barrons.com",
-    "timestamp": "2026-04-30",
-    "url": "https://www.barrons.com/articles/stocks-today-nasdaq-big-tech-earnings-gdp-1ca7b787?siteid=yhoof2&yptr=yahoo",
-    "body": "Up and Away . The markets had a remarkable day on Thursday, with strong showings from all the major indexes and a standout performance from one in particular. Copyright \u00a9 2026 Dow Jones & Company, Inc. All Rights Reserved. 87990cbe856818d5eddac44c7b1cdeb8"
+    "url": "https://finance.yahoo.com/markets/stocks/articles/anglogold-ashanti-au-stock-drops-220002068.html",
+    "body": "Oops, something went wrong In the latest close session, AngloGold Ashanti (AU) was down 1.38% at $92.44. This change lagged the S&P 500's 0.29% gain on the day. Meanwhile, the Dow lost 0.31%, and the Nasdaq, a tech-heavy index, added 0.89%. The stock of gold miner has fallen by 7.4% in the past month, lagging the Basic Materials sector's gain of 1.95% and the S&P 500's gain of 10.54%. The upcoming earnings release of AngloGold Ashanti will be of great interest to investors. The company's earnings report is expected on May 8, 2026. In that report, analysts expect AngloGold Ashanti to post earnings of $2.21 per share. This would mark year-over-year growth of 151.14%. Our most recent consensus estimate is calling for quarterly revenue of $3.34 billion, up 73.22% from the year-ago period."
   }
 ]

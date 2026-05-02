@@ -695,6 +695,197 @@ def _print_results_table(results: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Positions snapshot persistence (for dashboard)
+# ---------------------------------------------------------------------------
+
+def _save_positions_snapshot(
+    open_positions: dict[str, dict],
+    epic_map: dict[str, str],
+    results: list[dict],
+) -> None:
+    """Persist open positions + execution results as JSON for the dashboard."""
+    if not open_positions:
+        # No positions — write empty list so dashboard knows it ran
+        out_path = SIGNALS_DATA_DIR / "positions_snapshot.json"
+        out_path.write_text("[]", encoding="utf-8")
+        return
+
+    # Reverse epic_map: epic → symbol
+    epic_to_symbol = {v: k for k, v in epic_map.items()}
+
+    # Build results lookup: symbol → result dict
+    result_map = {r["symbol"]: r for r in results}
+
+    snapshot = []
+    for epic, pos in open_positions.items():
+        symbol = epic_to_symbol.get(epic, pos.get("symbol", epic))
+        result = result_map.get(symbol, {})
+        action = result.get("action", "")
+        note = result.get("note", "")
+
+        # Extract position management recommendation from the note
+        recommendation = "UNKNOWN"
+        rationale = note
+        if "HOLD" in action:
+            recommendation = "HOLD"
+        elif "ADJUSTED" in action:
+            recommendation = "ADJUST"
+        elif "CLOSED" in action:
+            recommendation = "CLOSE"
+
+        snapshot.append({
+            "symbol": symbol,
+            "ig_epic": epic,
+            "direction": pos.get("direction", ""),
+            "size": pos.get("size", 0),
+            "entry_level": pos.get("open_level", 0),
+            "current_level": pos.get("current_level", 0),
+            "pnl": pos.get("pnl", 0),
+            "stop_level": pos.get("stop_level"),
+            "limit_level": pos.get("limit_level"),
+            "deal_id": pos.get("deal_id", ""),
+            "instrument_name": pos.get("instrument_name", ""),
+            "position_decision": {
+                "recommendation": recommendation,
+                "rationale": rationale,
+            },
+        })
+
+    out_path = SIGNALS_DATA_DIR / "positions_snapshot.json"
+    out_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+    logger.info("Positions snapshot saved (%d position(s)) → %s", len(snapshot), out_path)
+
+
+# ---------------------------------------------------------------------------
+# Execution log persistence
+# ---------------------------------------------------------------------------
+
+def _save_execution_log(
+    results: list[dict],
+    capital: float,
+    dry_run: bool,
+    open_positions: dict[str, dict],
+    epic_map: dict[str, str],
+    snapshot: pd.DataFrame,
+) -> None:
+    """Append one row per instrument to the execution log parquet file."""
+    log_path = SIGNALS_DATA_DIR / "execution_log.parquet"
+    now = datetime.now(timezone.utc)
+
+    # Determine session from current hour
+    hour = now.hour
+    if hour in (0, 1):
+        session = "00:00"
+    elif 6 <= hour <= 8:
+        session = "07:00"
+    elif hour in (13, 14):
+        session = "13:30"
+    else:
+        session = "manual"
+
+    # Reverse epic_map: symbol → epic
+    epic_to_symbol = {v: k for k, v in epic_map.items()}
+
+    # Index snapshot by symbol for fast lookup
+    snap_by_symbol = snapshot.set_index("symbol") if "symbol" in snapshot.columns else snapshot
+
+    rows = []
+    for r in results:
+        symbol = r["symbol"]
+
+        # Snapshot data
+        snap_row = snap_by_symbol.loc[symbol] if symbol in snap_by_symbol.index else None
+
+        # Position data via epic
+        epic = epic_map.get(symbol, "")
+        pos = open_positions.get(epic) if epic else None
+
+        # Load decision for extra fields
+        signal_date = None
+        if snap_row is not None:
+            ts = snap_row.get("timestamp_of_last_bar") if hasattr(snap_row, "get") else None
+            if ts is not None:
+                try:
+                    signal_date = ts.date() if hasattr(ts, "date") else pd.Timestamp(ts).date()
+                except Exception:
+                    pass
+
+        decision = _load_decision(symbol, signal_date) if signal_date else None
+
+        # Direction
+        direction = r.get("direction")
+        if not direction and decision:
+            d = decision.get("direction")
+            if d == "LONG":
+                direction = "BUY"
+            elif d == "SHORT":
+                direction = "SELL"
+        if not direction and pos:
+            direction = pos.get("direction")
+
+        # Size
+        size = None
+        if decision and decision.get("size"):
+            size = decision.get("size")
+        if size is None and pos:
+            size = pos.get("size")
+
+        # Current price from snapshot
+        current_price = None
+        if snap_row is not None:
+            cp = snap_row.get("close") if hasattr(snap_row, "get") else None
+            if cp is not None and not pd.isna(cp):
+                current_price = float(cp)
+
+        # Technical signal from snapshot
+        technical_signal = None
+        if snap_row is not None:
+            sig = snap_row.get("signal") if hasattr(snap_row, "get") else None
+            if sig is not None and not pd.isna(sig):
+                technical_signal = int(sig)
+
+        # Unrealised P&L from position
+        unrealised_pnl = None
+        if pos:
+            unrealised_pnl = pos.get("pnl")
+
+        rows.append({
+            "timestamp": now,
+            "session": session,
+            "symbol": symbol,
+            "action": r.get("action", ""),
+            "direction": direction,
+            "size": size,
+            "order_type": decision.get("order_type", "MARKET") if decision else None,
+            "entry_level": decision.get("entry_level") if decision else (pos.get("open_level") if pos else None),
+            "stop_loss": decision.get("stop_loss") if decision else None,
+            "take_profit": decision.get("take_profit") if decision else None,
+            "risk_pct": decision.get("risk_pct") if decision else None,
+            "current_price": current_price,
+            "unrealised_pnl": unrealised_pnl,
+            "technical_signal": technical_signal,
+            "llm_recommendation": decision.get("llm_recommendation") if decision else None,
+            "deal_ref": r.get("deal_ref", ""),
+            "rationale": r.get("note", ""),
+        })
+
+    new_df = pd.DataFrame(rows)
+
+    # Read existing log and concat
+    if log_path.exists():
+        try:
+            existing = pd.read_parquet(log_path)
+            combined = pd.concat([existing, new_df], ignore_index=True)
+        except Exception:
+            combined = new_df
+    else:
+        combined = new_df
+
+    combined.to_parquet(log_path, index=False)
+    logger.info("Execution log saved (%d new row(s)) → %s", len(new_df), log_path)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -810,6 +1001,12 @@ def main() -> None:
         results.append(result)
 
     logger.info("=" * 60)
+
+    # Persist positions snapshot for dashboard (includes LLM management decisions)
+    _save_positions_snapshot(open_positions, epic_map, results)
+
+    # Persist execution log
+    _save_execution_log(results, capital, dry_run, open_positions, epic_map, snapshot)
 
     # Print summary table
     _print_results_table(results)

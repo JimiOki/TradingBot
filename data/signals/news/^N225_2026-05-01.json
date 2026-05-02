@@ -1,10 +1,17 @@
 [
   {
-    "title": "IG client sentiment: 53% long / 47% short (LONG-biased)",
+    "title": "IG client sentiment: 42% long / 58% short (SHORT-biased)",
     "source": "IG Client Sentiment",
     "timestamp": "",
-    "long_pct": 53.0,
-    "short_pct": 47.0
+    "long_pct": 42.0,
+    "short_pct": 58.0
+  },
+  {
+    "title": "Earnings, Wall Street Cues Lift Asian Stock Markets in Thin Holiday Trading",
+    "source": "MT Newswires",
+    "timestamp": "2026-05-01",
+    "url": "https://finance.yahoo.com/markets/world-indices/articles/earnings-wall-street-cues-lift-103300652.html",
+    "body": "Oops, something went wrong Asian stock markets gained on Friday in holiday-thinned trading, as traders weighed earnings reports"
   },
   {
     "title": "Tokyo Electron shares surge as bumper guidance offsets middling earnings",
@@ -12,13 +19,6 @@
     "timestamp": "2026-05-01",
     "url": "https://finance.yahoo.com/markets/stocks/articles/tokyo-electron-shares-surge-bumper-061801356.html",
     "body": "Oops, something went wrong Investing.com-- Tokyo Electron Ltd. (TYO:8035) shares rose sharply on Friday after the Japanese chipmaking equipment maker forecast above-consensus earnings for the first half of the fiscal year, thanks to outsized AI-fueled demand. Tokyo Electron rose as much as 8.6% to 48,190.0 yen, and was among the best performers on the Nikkei 225 index, which added 0.6%. The semiconductor equipment maker forecast net sales of 1.57 trillion yen ($1 billion) for the first six months of the fiscal year to March 31, 2027\u2013 representing a 33% year-on-year increase and above market expectations of 1.42 trillion yen. Operating income was forecast at 431.0 billion yen, up 42.2% and above market estimates of 405.9 billion yen. The bumper outlook\u2013 which comes amid increasing"
-  },
-  {
-    "title": "Asian shares gain with most markets closed for May Day, while oil holds steady at $111 a barrel",
-    "source": "Associated Press",
-    "timestamp": "2026-05-01",
-    "url": "https://finance.yahoo.com/markets/world-indices/articles/asian-shares-gain-most-markets-025005990.html",
-    "body": "Oops, something went wrong Shares gained in Asia on Friday, though most markets in the region were closed for May Day holidays. Brent crude\u2019s price rose 67 cents to $111.07 per barrel while U.S. benchmark crude oil added 10 cents to $105.17 a barrel. Prospects for a deal to cement a three-week ceasefire in the Iran wa r remained clouded as Iran\u2019s supreme leader said it will protect its nuclear and missile capabilities as a national asset. The war's shocks to oil supplies and prices are putting pressure on U.S. President Donald Trump, who was floating a new plan to reopen the Strait of Hormuz, a critical passageway for oil and gas exports from the Middle East. In Tokyo, the Nikkei 225 gained 0.7% to 59,678.31 as the Japanese yen gained against the U.S. dollar. The dollar bought 157.16 yen,"
   },
   {
     "title": "Oil Outlook, Interest Rates Dent Asian Stock Markets",

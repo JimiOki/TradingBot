@@ -1,44 +1,44 @@
 [
   {
-    "title": "IG client sentiment: 42% long / 58% short (SHORT-biased)",
+    "title": "IG client sentiment: 35% long / 65% short (SHORT-biased)",
     "source": "IG Client Sentiment",
     "timestamp": "",
-    "long_pct": 42.0,
-    "short_pct": 58.0
+    "long_pct": 35.0,
+    "short_pct": 65.0
   },
   {
-    "title": "Stock market today: S&P 500, Nasdaq, Dow futures tick up after gauges close April on record highs",
-    "source": "Yahoo Finance",
-    "timestamp": "2026-04-30",
-    "url": "https://finance.yahoo.com/markets/stocks/live/stock-market-today-friday-may-1-records-apple-iran-231056146.html",
-    "body": "Oops, something went wrong US stock futures ticked higher Friday morning, building on a powerful rally that pushed major indexes to fresh records and capped a standout April for equities. Futures tied to the Dow Jones Industrial Average ( YM=F ) and S&P 500 ( ES=F ) edged up 0.2% and 0.1%, respectively. Nasdaq 100 futures ( NQ=F ) hovered above the baseline. During Thursday\u2019s regular session , stocks surged across the board. The Dow ( ^DJI ) rallied more than 790 points, or 1.6%, while the S&P 500 ( ^GSPC ) climbed just over 1% to close above 7,200 for the first time on record. The Nasdaq Composite ( ^IXIC ) added nearly 0.9% and also reached a new high. In after-hours trading, Apple ( AAPL ) jumped roughly 3% after delivering better-than-expected fiscal second-quarter results . The tech"
-  },
-  {
-    "title": "Nvidia has powered one-third of the Magnificent 7's bull market gains: Chart of the Day",
-    "source": "Yahoo Finance",
-    "timestamp": "2026-04-30",
-    "url": "https://finance.yahoo.com/markets/article/nvidia-has-powered-one-third-of-the-magnificent-7s-bull-market-gains-chart-of-the-day-110000790.html",
-    "body": "Oops, something went wrong Nvidia ( NVDA ) didn\u2019t start this bull market \u2014 but it has come to define it. The S&P 500 ( ^GSPC ) bottomed on Oct. 12, 2022, in the wake of the 2022 bear market. But the \u201cMagnificent Seven\u201d tech stocks \u2014 Apple ( AAPL ), Alphabet ( GOOGL , GOOG ), Microsoft ( MSFT ), Amazon ( AMZN ), Meta ( META ), Tesla ( TSLA ), and Nvidia \u2014 didn\u2019t fully join the party right away. The group\u2019s index did not bottom until late December 2022 \u2014 a stretch when the S&P 500 rose 6% from its bear market low, while the Magnificent Seven fell another 12%. Then the market\u2019s leadership changed. ChatGPT 3.5 launched on Nov. 30, 2022, and the next phase of the bull market quickly became an artificial intelligence trade, with Nvidia at the epicenter. Since the S&P 500\u2019s bear-market low, the"
-  },
-  {
-    "title": "Why Are Investors Ebullient About Equities but Dour Over Dividends?",
-    "source": "CME Group",
+    "title": "Big Tech powers the market with strong earnings wins",
+    "source": "Yahoo Finance Video",
     "timestamp": "2026-05-01",
-    "url": "https://finance.yahoo.com/markets/stocks/articles/why-investors-ebullient-equities-dour-060000608.html",
-    "body": "Oops, something went wrong Since the 2015 launch of S&P 500 Annual Dividend Index Futures, there has been a persistent gap between market-implied dividend expectations and actual payouts. It\u2019s been the same for Russell 2000 and Nasdaq 100 Dividend Index Futures since their launch in 2022. This raises the question: is the tendency to underprice realized dividend growth a harvestable risk premium or a statistical quirk? To avoid overemphasizing market pricing on any given day, we average the pricing for the annual dividend futures over the fourth quarter of each year since their launch and compare the Q4 average expectation to the actual dividend payouts in subsequent years (as shown in the charts below). The results are striking. In the vast majority of cases, realized dividend payments"
+    "url": "https://finance.yahoo.com/video/big-tech-powers-the-market-with-strong-earnings-wins-204436892.html",
+    "body": "Oops, something went wrong Concurrent Wealth Management chief investment strategist Leah Bennett joins Josh Lipton on Market Domination Overtime to discuss what investors should watch as Big Tech navigates geopolitical volatility. Technology is winning right now. Um, it's interesting. I think we've had this been going on for a little over a year now and if you think about the reasons why technology and I would say the adoption and the efficiencies from technology are really driving the market. Um, we've never gone through a period like COVID where we've really had true supply chain issues as well as labor issues for as long as companies had them and companies had to come up with solutions and not necessarily band-aids, longer term solutions. So we've had this massive adoption not only of"
   },
   {
-    "title": "Jane Fraser Turned Citigroup Inside Out. Now Comes the Hard Part.",
-    "source": "Barrons.com",
+    "title": "Exxon, Chevron earnings take center stage",
+    "source": "Yahoo Finance Video",
     "timestamp": "2026-05-01",
-    "url": "https://www.barrons.com/articles/jane-fraser-citigroup-turnaround-f8523833?siteid=yhoof2&yptr=yahoo",
-    "body": "The Fear of 13 is a new play on Broadway starring Adrien Brody about a man wrongly imprisoned for murder. Brody\u2019s character passes his time learning new words, including \u201ctriskaidekaphobia,\u201d the fear of the number 13. Copyright \u00a9 2026 Dow Jones & Company, Inc. All Rights Reserved. 87990cbe856818d5eddac44c7b1cdeb8"
+    "url": "https://finance.yahoo.com/video/exxon-chevron-earnings-take-center-stage-141820769.html",
+    "body": "Oops, something went wrong Morning Brief hosts Julie Hyman and Myles Udland break down earnings results for Exxon Mobil ( XOM ) and Chevron ( CVX ). The best performing group in the S&P 500 this year had its two biggest companies report this morning. Exxon and Chevron both reported this morning. Um and it's not a straight line from high or higher oil prices to higher profits for these guys. in part because of hedging. And I thought this was really interesting. Basically, like they hedged at the beginning of the year. and they hedged against lower oil prices, not higher. and they also can't realize those hedges until the oil is delivered. and some of that oil is not getting delivered because of what's going on. So, it's in other words, it's a more complicated quarter for these two"
   },
   {
-    "title": "Dow Jones Futures Rise As Apple Climbs On Earnings, Sandisk Skids; Stock Market At High",
-    "source": "Investor's Business Daily",
+    "title": "Nvidia Jumped Back Above $5 Trillion. When Will It Hit $6 Trillion?",
+    "source": "Motley Fool",
+    "timestamp": "2026-05-02",
+    "url": "https://www.fool.com/investing/2026/05/01/nvidia-jumped-back-above-5-trillion-when-hit-6/",
+    "body": "Nvidia ( NVDA 0.48% ) first crossed the $5 trillion valuation threshold in October 2025. It then promptly retreated from those levels, but it's bouncing back. Nvidia reached a $5 trillion valuation again in April, and now the question is when it will hit $6 trillion market capitalization. Growing from a $5 trillion company to a $6 trillion one is no easy feat, as it requires the stock to rise 20%. Still, I think Nvidia has the growth in store to do it before 2026 is over. Considering 20% is far greater than what the S&P 500 usually returns over a whole year, that would make Nvidia a strong investment pick, and I think it's exactly that. Image source: Getty Images. Doing the math to figure out what growth Nvidia must achieve to hit a $6 trillion valuation isn't that difficult, but first,"
+  },
+  {
+    "title": "Why Iradimed Stock Topped the Market Today",
+    "source": "Motley Fool",
+    "timestamp": "2026-05-02",
+    "url": "https://www.fool.com/investing/2026/05/01/why-iradimed-stock-topped-the-market-today/",
+    "body": "Mechanical resonance imaging (MRI) equipment specialist Iradimed ( IRMD +3.87% ) ended the stock trading week in style on Friday. On the back of a well-received quarterly earnings report, investors traded the company's shares up by more than 4%. That was robust enough to trounce the 0.3% gain of the bellwether S&P 500 index that trading session. Iradimed posted its first-quarter figures that morning, and Mr. Market clearly liked what he saw. The company's top line expanded by 13% to just under $22 million, which exceeded the average analyst estimate of $20.8 million. Image source: Getty Images. In terms of profitability, Iradimed's net income under generally accepted accounting principles (GAAP) also increased, by 24% to over $5.8 million. On a per-share, non-GAAP (adjusted) basis,"
+  },
+  {
+    "title": "VOOG vs. VUG: Which Vanguard Growth ETF Reigns Supreme?",
+    "source": "Motley Fool",
     "timestamp": "2026-05-01",
-    "url": "https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-apple-sandisk-roku-earnings/?src=A00220&yptr=yahoo",
-    "body": "BREAKING: Apple Leads Earnings Movers After S&P 500, Nasdaq Hit Highs Dow Jones futures rose slightly early Friday, along with S&P 500 futures and Nasdaq futures. Apple (AAPL), Sandisk (SNDK), Western Digital (WDC) and Roku (ROKU) all beat earnings views after the close. The stock market rally had a solid session with the S&P 500 and Nasdaq hitting new highs amid massive earnings news and crude oil prices pulling back. Google\u2026 11:13 AM ET The Dow Jones index surged 790 points and the S&P 500 and Nasdaq set new highs. Nvidia stock sold off,... 11:13 AM ET The Dow Jones index surged 790 points and the S&P... Get instant access to exclusive stock lists, expert market analysis and powerful tools with 2 months of IBD Digital for only $20! Get market updates, educational videos, webinars, and"
+    "url": "https://www.fool.com/coverage/etfs/2026/05/01/voog-vs-vug-which-vanguard-growth-etf-reigns-supreme/",
+    "body": "Vanguard S&P 500 Growth ETF ( VOOG +0.55% ) and Vanguard Growth ETF ( VUG +0.87% ) both target large-cap U.S. growth stocks but differ in their underlying index methodologies, annual costs, and dividend yields. Both the VUG ETF and the VOOG ETF provide targeted exposure to the largest growth-oriented companies in the U.S. stock market. While they share many top holdings, their underlying index methodologies create distinct portfolios. This comparison helps investors determine if the S&P 500 variant's methodology and slightly higher cost are worth the tradeoff for its recent outperformance. Beta measures price volatility relative to the S&P 500; beta is calculated from five-year monthly returns. The one-year return represents total return over the trailing 12 months. Dividend yield is the"
   }
 ]

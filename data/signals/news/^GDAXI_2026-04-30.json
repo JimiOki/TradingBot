@@ -1,10 +1,17 @@
 [
   {
-    "title": "IG client sentiment: 54% long / 46% short (LONG-biased)",
+    "title": "IG client sentiment: 38% long / 62% short (SHORT-biased)",
     "source": "IG Client Sentiment",
     "timestamp": "",
-    "long_pct": 54.0,
-    "short_pct": 46.0
+    "long_pct": 38.0,
+    "short_pct": 62.0
+  },
+  {
+    "title": "European Market's Hidden Value Gems Estimated Below Fair Worth In May 2026",
+    "source": "Simply Wall St.",
+    "timestamp": "2026-05-01",
+    "url": "https://finance.yahoo.com/markets/stocks/articles/european-markets-hidden-value-gems-103755229.html",
+    "body": "Oops, something went wrong As European markets face challenges, with the STOXX Europe 600 Index down and major indices like Germany's DAX and France's CAC 40 experiencing declines, investors are increasingly focused on identifying stocks that may be undervalued amid geopolitical tensions and economic uncertainties. In this environment, a good stock is often characterized by strong fundamentals and resilience to external pressures, offering potential value even when broader market sentiment is cautious. Name Current Price Fair Value (Est) Discount (Est) Sicily by Car (BIT:SBC) \u20ac3.18 \u20ac6.32 49.7% Nil\u00f6rngruppen (OM:NIL B) SEK50.20 SEK98.46 49% LION E-Mobility (XTRA:LMIA) \u20ac1.59 \u20ac3.16 49.6% Eltel (OM:ELTEL) SEK9.74 SEK19.10 49% Dometic Group (OM:DOM) SEK31.20 SEK61.56 49.3% DEUTZ (XTRA:DEZ)"
   },
   {
     "title": "European Undervalued Small Caps With Insider Buying To Consider In May 2026",
@@ -33,12 +40,5 @@
     "timestamp": "2026-04-30",
     "url": "https://finance.yahoo.com/markets/stocks/articles/top-european-dividend-stocks-consider-103211327.html",
     "body": "Oops, something went wrong Despite recent downturns in the European markets, with the STOXX Europe 600 Index and major indices like Germany's DAX and France's CAC 40 experiencing declines, traditionally defensive sectors such as utilities and telecoms have shown resilience amid heightened geopolitical risks. In this environment, dividend stocks can offer stability by providing regular income streams to investors, making them an attractive consideration for those looking to navigate uncertain market conditions. Name Dividend Yield Dividend Rating Zurich Insurance Group (SWX:ZURN) 4.56% \u2605\u2605\u2605\u2605\u2605\u2605 Zinzino (OM:ZZ B) 4.72% \u2605\u2605\u2605\u2605\u2605\u2605 Teleperformance (ENXTPA:TEP) 8.16% \u2605\u2605\u2605\u2605\u2605\u2605 Telekom Austria (WBAG:TKA) 4.42% \u2605\u2605\u2605\u2605\u2605\u2605 Swiss Re (SWX:SREN) 5.09% \u2605\u2605\u2605\u2605\u2605\u2605 Rubis (ENXTPA:RUI) 5.97% \u2605\u2605\u2605\u2605\u2605\u2605 Hannover R\u00fcck"
-  },
-  {
-    "title": "European Stocks Head Lower in Wednesday Trading; Strait of Hormuz Stalemate Continues",
-    "source": "MT Newswires",
-    "timestamp": "2026-04-29",
-    "url": "https://finance.yahoo.com/markets/stocks/articles/european-stocks-head-lower-wednesday-154905659.html",
-    "body": "Oops, something went wrong The European stock markets were tracking lower Wednesday as a stalemate over the reopening of the St"
   }
 ]
