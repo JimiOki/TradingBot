@@ -1,0 +1,155 @@
+[
+  {
+    "symbol": "GC=F",
+    "ig_epic": "CS.D.USCGC.TODAY.IP",
+    "direction": "SELL",
+    "size": 1.4,
+    "entry_level": 4612.31,
+    "current_level": 4614.75,
+    "pnl": -3.42,
+    "stop_level": 4758.539805,
+    "limit_level": 4316.249805,
+    "deal_id": "DIAAAAXBPLFTCAG",
+    "instrument_name": "Spot Gold",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (SELL, deal_id=DIAAAAXBPLFTCAG)"
+    }
+  },
+  {
+    "symbol": "^GDAXI",
+    "ig_epic": "IX.D.DAX.DAILY.IP",
+    "direction": "SELL",
+    "size": 0.5,
+    "entry_level": 24126.3,
+    "current_level": 24292.9,
+    "pnl": -83.3,
+    "stop_level": 24716.048556,
+    "limit_level": 22931.562556,
+    "deal_id": "DIAAAAXBPLN5UA4",
+    "instrument_name": "Germany 40",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (SELL, deal_id=DIAAAAXBPLN5UA4)"
+    }
+  },
+  {
+    "symbol": "^DJI",
+    "ig_epic": "IX.D.DOW.DAILY.IP",
+    "direction": "BUY",
+    "size": 0.5,
+    "entry_level": 49308.2,
+    "current_level": 49456.1,
+    "pnl": 73.95,
+    "stop_level": 48314.695337,
+    "limit_level": 51023.146937,
+    "deal_id": "DIAAAAXBPKVXMAL",
+    "instrument_name": "Wall Street",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (BUY, deal_id=DIAAAAXBPKVXMAL)"
+    }
+  },
+  {
+    "symbol": "CL=F",
+    "ig_epic": "CC.D.CL.USS.IP",
+    "direction": "BUY",
+    "size": 0.5,
+    "entry_level": 10093.5,
+    "current_level": 10228.6,
+    "pnl": 67.55,
+    "stop_level": 8978.6,
+    "limit_level": 12284.4,
+    "deal_id": "DIAAAAXBZQWFSAE",
+    "instrument_name": "Oil - US Crude",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (BUY, deal_id=DIAAAAXBZQWFSAE)"
+    }
+  },
+  {
+    "symbol": "HG=F",
+    "ig_epic": "CS.D.COPPER.TODAY.IP",
+    "direction": "BUY",
+    "size": 1.0,
+    "entry_level": 12970.0,
+    "current_level": 12949.8,
+    "pnl": -20.2,
+    "stop_level": 12631.3,
+    "limit_level": 13601.3,
+    "deal_id": "DIAAAAXBZRN9KAF",
+    "instrument_name": "Copper",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (BUY, deal_id=DIAAAAXBZRN9KAF)"
+    }
+  },
+  {
+    "symbol": "^FTSE",
+    "ig_epic": "IX.D.FTSE.DAILY.IP",
+    "direction": "SELL",
+    "size": 1.7,
+    "entry_level": 10369.8,
+    "current_level": 10351.0,
+    "pnl": 31.96,
+    "stop_level": 10499.6,
+    "limit_level": 10174.6,
+    "deal_id": "DIAAAAXCW6TPGAU",
+    "instrument_name": "FTSE 100",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (SELL, deal_id=DIAAAAXCW6TPGAU)"
+    }
+  },
+  {
+    "symbol": "^GSPC",
+    "ig_epic": "IX.D.SPTRD.DAILY.IP",
+    "direction": "BUY",
+    "size": 2.5,
+    "entry_level": 7166.7,
+    "current_level": 7219.61,
+    "pnl": 132.27,
+    "stop_level": 7053.8,
+    "limit_level": 7392.4,
+    "deal_id": "DIAAAAXCW6MS8BC",
+    "instrument_name": "US 500",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (BUY, deal_id=DIAAAAXCW6MS8BC)"
+    }
+  },
+  {
+    "symbol": "NG=F",
+    "ig_epic": "CC.D.NG.USS.IP",
+    "direction": "BUY",
+    "size": 1.7,
+    "entry_level": 2791.0,
+    "current_level": 2769.5,
+    "pnl": -36.55,
+    "stop_level": 2632.0,
+    "limit_level": 3082.0,
+    "deal_id": "DIAAAAXC3ECLWA8",
+    "instrument_name": "Natural Gas",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (BUY, deal_id=DIAAAAXC3ECLWA8)"
+    }
+  },
+  {
+    "symbol": "^N225",
+    "ig_epic": "IX.D.NIKKEI.DAILY.IP",
+    "direction": "BUY",
+    "size": 0.5,
+    "entry_level": 59345.0,
+    "current_level": 59246.4,
+    "pnl": -49.3,
+    "stop_level": 57639.9,
+    "limit_level": 62755.2,
+    "deal_id": "DIAAAAXC3C48XAC",
+    "instrument_name": "Japan 225",
+    "position_decision": {
+      "recommendation": "UNKNOWN",
+      "rationale": "position already open in same direction (BUY, deal_id=DIAAAAXC3C48XAC)"
+    }
+  }
+]
