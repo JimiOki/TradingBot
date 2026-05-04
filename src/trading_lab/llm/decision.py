@@ -279,17 +279,29 @@ class DecisionService:
             context, position_direction, entry_level,
             current_stop, current_target, pnl_points,
         )
-        try:
-            raw = self._client.complete(prompt)
-            parsed = self._parse_position_management(raw)
-        except (LLMError, LLMTimeoutError, ValueError) as exc:
-            logger.warning("LLM position management failed for %s: %s", context.symbol, exc)
+        # Retry once on JSON parse failure (truncated response)
+        last_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                raw = self._client.complete(prompt)
+                parsed = self._parse_position_management(raw)
+                break
+            except ValueError as exc:
+                last_exc = exc
+                if attempt == 0:
+                    logger.info("Position management JSON parse failed for %s, retrying: %s", context.symbol, exc)
+                    continue
+            except (LLMError, LLMTimeoutError) as exc:
+                last_exc = exc
+                break
+        else:
+            logger.warning("LLM position management failed for %s: %s", context.symbol, last_exc)
             return PositionManagementDecision(
                 symbol=context.symbol,
                 recommendation="HOLD",
                 stop_loss=None,
                 take_profit=None,
-                rationale=f"LLM unavailable: {exc}",
+                rationale=f"LLM unavailable: {last_exc}",
                 generated_at=datetime.now(timezone.utc),
                 model=getattr(self._client, "model", "stub"),
             )
