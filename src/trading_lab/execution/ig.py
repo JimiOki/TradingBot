@@ -466,22 +466,6 @@ class IgBrokerAdapter(BrokerAdapter):
         # Build a clean request body — no null fields.  The trading_ig
         # library's create_open_position() sends null fields that IG's
         # spreadbet engine rejects (REJECT_CFD_ORDER_ON_SPREADBET_ACCOUNT).
-        body = {
-            "currencyCode": "GBP",
-            "direction": order.side,          # "BUY" or "SELL"
-            "epic": order.epic,
-            "expiry": "DFB",                  # Daily Funded Bet — required for spreadbets
-            "forceOpen": True,
-            "guaranteedStop": False,
-            "orderType": order.order_type,
-            "size": order.size,
-            "stopDistance": order.stop_distance,
-            "limitDistance": order.limit_distance,
-        }
-
-        if order.order_type == "LIMIT":
-            body["level"] = order.level
-            body["timeInForce"] = "GOOD_TILL_CANCELLED"
 
         # Use the library's authenticated session headers (OAuth Bearer token)
         # and POST directly to avoid the library injecting null fields.
@@ -490,11 +474,47 @@ class IgBrokerAdapter(BrokerAdapter):
         headers["Content-Type"] = "application/json; charset=UTF-8"
         headers["Accept"] = "application/json; charset=UTF-8"
 
-        resp = requests.post(
-            f"{ig.BASE_URL}/positions/otc",
-            json=body,
-            headers=headers,
-        )
+        if order.order_type == "LIMIT":
+            # LIMIT orders go via the working orders endpoint
+            body = {
+                "currencyCode": "GBP",
+                "direction": order.side,
+                "epic": order.epic,
+                "expiry": "DFB",
+                "forceOpen": True,
+                "guaranteedStop": False,
+                "level": order.level,
+                "size": order.size,
+                "stopDistance": order.stop_distance,
+                "limitDistance": order.limit_distance,
+                "timeInForce": "GOOD_TILL_CANCELLED",
+                "type": "LIMIT",
+            }
+            resp = requests.post(
+                f"{ig.BASE_URL}/workingorders/otc",
+                json=body,
+                headers=headers,
+            )
+        else:
+            # MARKET orders go via positions endpoint
+            body = {
+                "currencyCode": "GBP",
+                "direction": order.side,
+                "epic": order.epic,
+                "expiry": "DFB",
+                "forceOpen": True,
+                "guaranteedStop": False,
+                "orderType": "MARKET",
+                "size": order.size,
+                "stopDistance": order.stop_distance,
+                "limitDistance": order.limit_distance,
+            }
+            resp = requests.post(
+                f"{ig.BASE_URL}/positions/otc",
+                json=body,
+                headers=headers,
+            )
+
         resp.raise_for_status()
         result = resp.json()
 

@@ -341,6 +341,11 @@ def process_instrument(
     result["order_type"] = order_type
     side = _llm_direction_to_ig(direction)
 
+    # --- Extract LLM levels early (needed by both position mgmt and new orders) ---
+    close = float(row.get("close")) if row.get("close") is not None else None
+    llm_stop = decision.get("stop_loss")
+    llm_tp = decision.get("take_profit")
+
     # --- Position management: existing position + GO ---
     if existing_pos:
         pos_direction = existing_pos.get("direction", "")  # BUY or SELL
@@ -499,10 +504,6 @@ def process_instrument(
                 return result
 
     # --- Stop distance / limit distance from LLM absolute levels ---
-    close = float(row.get("close")) if row.get("close") is not None else None
-
-    llm_stop = decision.get("stop_loss")
-    llm_tp = decision.get("take_profit")
     risk_pct = decision.get("risk_pct", 1.0)
     entry_level = decision.get("entry_level")
 
