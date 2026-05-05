@@ -49,6 +49,7 @@ from trading_lab.llm.context import build_signal_context
 from trading_lab.llm.decision import DecisionService
 from trading_lab.llm.explainer import ExplanationService
 from trading_lab.llm.factory import create_llm_client
+from trading_lab.llm.trade_stats import build_instrument_stats
 from trading_lab.logging_config import setup_logging
 from trading_lab.paths import (
     CURATED_DATA_DIR,
@@ -236,6 +237,8 @@ def process_instrument_multi(
     primary_strategy_name: str,
     explanation_svc: ExplanationService,
     decision_svc: DecisionService,
+    ig_transactions: list[dict] | None = None,
+    execution_log_path: "Path | None" = None,
 ) -> dict:
     """Run ALL strategies on one instrument and return its snapshot row.
 
@@ -346,6 +349,12 @@ def process_instrument_multi(
             "signal_date": primary_signals_df.index[-1].date() if hasattr(primary_signals_df.index[-1], "date") else date.today(),
         }
         sr_vol = _compute_sr_and_volume(bars, float(row["close"])) if row["close"] is not None else {}
+        exec_stats = ""
+        if execution_log_path:
+            try:
+                exec_stats = build_instrument_stats(symbol, execution_log_path, ig_transactions)
+            except Exception as exc:
+                logger.debug("Could not build execution stats for %s: %s", symbol, exc)
         ctx = build_signal_context(
             signal_row=signal_row_for_llm,
             instrument=instrument,
@@ -354,6 +363,7 @@ def process_instrument_multi(
             support_levels=sr_vol.get("support_levels"),
             resistance_levels=sr_vol.get("resistance_levels"),
             volume_ratio=sr_vol.get("volume_ratio"),
+            execution_stats=exec_stats,
         )
         explanation_svc.get_or_generate(ctx)
         decision_svc.get_or_generate(ctx)
@@ -536,6 +546,18 @@ def main() -> None:
             logger.error("Symbol %s not found in instruments.yaml", args.symbol)
             sys.exit(1)
 
+    # Fetch IG transaction history once for execution stats
+    ig_transactions: list[dict] = []
+    try:
+        from trading_lab.execution.ig import IgBrokerAdapter
+        ig_broker = IgBrokerAdapter()
+        ig_transactions = ig_broker.fetch_transaction_history(days=60)
+        logger.info("Fetched %d IG transactions for execution stats.", len(ig_transactions))
+    except Exception as exc:
+        logger.warning("Could not fetch IG transactions for stats: %s", exc)
+
+    execution_log_path = SIGNALS_DATA_DIR / "execution_log.parquet"
+
     rows = []
     failed: list[str] = []
 
@@ -563,6 +585,8 @@ def main() -> None:
                 PRIMARY_STRATEGY_NAME,
                 explanation_svc,
                 decision_svc,
+                ig_transactions=ig_transactions,
+                execution_log_path=execution_log_path,
             )
             rows.append(row)
             if row["status"] not in ("ok", "data_missing"):

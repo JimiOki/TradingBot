@@ -32,6 +32,7 @@ class SignalContext:
     support_levels: list[float] | None = None   # nearest swing lows below current price
     resistance_levels: list[float] | None = None  # nearest swing highs above current price
     volume_ratio: float | None = None           # current volume / 20-day avg volume
+    execution_stats: str = ""                   # per-instrument execution history summary
 
 
 def build_signal_context(
@@ -42,6 +43,7 @@ def build_signal_context(
     support_levels: list[float] | None = None,
     resistance_levels: list[float] | None = None,
     volume_ratio: float | None = None,
+    execution_stats: str = "",
 ) -> SignalContext:
     """Build a SignalContext from a signal row dict and instrument config dict.
 
@@ -93,4 +95,5 @@ def build_signal_context(
         support_levels=support_levels,
         resistance_levels=resistance_levels,
         volume_ratio=volume_ratio,
+        execution_stats=execution_stats,
     )

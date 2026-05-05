@@ -98,7 +98,7 @@ class DecisionService:
                 logger.warning("Decision cache read failed for %s: %s", cache_path, exc)
 
         # Cache miss — call LLM
-        prompt = build_decision_prompt(context)
+        prompt = build_decision_prompt(context, execution_stats=context.execution_stats)
         try:
             raw = self._client.complete(prompt)
             decision = self._parse_decision(raw)
@@ -278,6 +278,7 @@ class DecisionService:
         prompt = build_position_management_prompt(
             context, position_direction, entry_level,
             current_stop, current_target, pnl_points,
+            execution_stats=context.execution_stats,
         )
         # Retry once on JSON parse failure (truncated response)
         last_exc: Exception | None = None

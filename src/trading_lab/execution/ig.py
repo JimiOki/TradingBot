@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 import requests
 
@@ -238,6 +240,76 @@ class IgBrokerAdapter(BrokerAdapter):
 
         except Exception as exc:
             logger.warning("fetch_positions failed: %s", exc)
+            return []
+
+    # ------------------------------------------------------------------
+    # Transaction history (closed trades)
+    # ------------------------------------------------------------------
+
+    def fetch_transaction_history(self, days: int = 30) -> list[dict]:
+        """Return closed trade history for the last N days.
+
+        Calls ``IGService.fetch_transaction_history()`` which returns a
+        DataFrame with one row per transaction.
+
+        Returns:
+            List of transaction dicts.  Returns ``[]`` on any failure.
+        """
+        try:
+            ig = self._session()
+            to_date = datetime.now()
+            from_date = to_date - timedelta(days=days)
+
+            df = ig.fetch_transaction_history(
+                trans_type="ALL",
+                from_date=from_date.strftime("%Y-%m-%d"),
+                to_date=to_date.strftime("%Y-%m-%d"),
+            )
+
+            if df is None or (hasattr(df, "empty") and df.empty):
+                return []
+
+            transactions: list[dict] = []
+            for _, row in df.iterrows():
+                try:
+                    # Parse profitAndLoss — strip currency symbol (e.g. "£12.50" or "-£3.00")
+                    raw_pnl = str(row.get("profitAndLoss", "0") or "0")
+                    pnl_clean = re.sub(r"[^\d.\-]", "", raw_pnl)
+                    pnl = float(pnl_clean) if pnl_clean else 0.0
+
+                    # Extract currency symbol from profitAndLoss string
+                    currency_match = re.match(r"[^\d\-]*", raw_pnl)
+                    currency = currency_match.group(0).strip() if currency_match else ""
+
+                    # Parse numeric fields safely
+                    def _to_float(val) -> float:
+                        try:
+                            return float(val) if val not in (None, "", "-") else 0.0
+                        except (TypeError, ValueError):
+                            return 0.0
+
+                    transactions.append(
+                        {
+                            "date": str(row.get("date", "") or ""),
+                            "instrument_name": str(row.get("instrumentName", "") or ""),
+                            "reference": str(row.get("reference", "") or ""),
+                            "transaction_type": str(row.get("transactionType", "") or ""),
+                            "direction": str(row.get("period", "") or ""),
+                            "open_level": _to_float(row.get("openLevel")),
+                            "close_level": _to_float(row.get("closeLevel")),
+                            "size": _to_float(row.get("size")),
+                            "pnl": pnl,
+                            "currency": currency,
+                        }
+                    )
+                except Exception as row_exc:
+                    logger.warning("Skipping malformed transaction row: %s", row_exc)
+
+            logger.info("Fetched %d transactions for last %d days", len(transactions), days)
+            return transactions
+
+        except Exception as exc:
+            logger.warning("fetch_transaction_history failed: %s", exc)
             return []
 
     # ------------------------------------------------------------------

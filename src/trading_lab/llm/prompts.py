@@ -92,10 +92,12 @@ all of it, reach a conviction, and specify the trade parameters if acting.
 
 ## Volume
 {volume_section}
+{execution_stats_section}
 {news_section}
 
 ## How to reason
 - Weigh the technical consensus, news catalysts, and sentiment together — no single input wins automatically
+- Review your execution history if available — it shows whether your stops, order types, and hold times have been effective on this instrument. Adjust mechanics, not conviction.
 - A strong macro catalyst in the news can justify a direction that conflicts with weak technicals, and vice versa
 - If IG client sentiment strongly opposes your intended direction (>70% on the other side), note it — \
   it may be a contrarian signal or a warning
@@ -160,10 +162,12 @@ You are a discretionary spread-betting trader managing an existing position on {
 
 ## Key Price Levels
 {sr_section}
+{execution_stats_section}
 {news_section}
 
 ## How to reason
 - You already have a position. The question is NOT whether to open a new trade — it's whether to HOLD, ADJUST, or CLOSE the existing one.
+- If execution history shows stops are consistently too tight (high stop-hit rate), consider giving more room on adjustments
 - HOLD: the trade thesis is still valid, no changes needed
 - ADJUST: the trade thesis is still valid but stop or target should be updated based on new price action
   - Stops should generally move in the profitable direction (trailing stop) — tightening to lock in gains
@@ -319,7 +323,7 @@ def build_explanation_prompt(context: "SignalContext", fast_sma_period: int = 20
     return EXPLANATION_PROMPT_NO_NEWS.format(**kwargs)
 
 
-def build_decision_prompt(context: "SignalContext") -> str:
+def build_decision_prompt(context: "SignalContext", execution_stats: str = "") -> str:
     """Build the decision prompt for a given SignalContext."""
     if context.news_headlines:
         news_section = "\n## Recent News Headlines\n" + _format_news_section(context.news_headlines)
@@ -328,6 +332,10 @@ def build_decision_prompt(context: "SignalContext") -> str:
     strategy_signals_section = _format_strategy_signals(context.strategy_signals)
     sr_section = _format_sr_section(context)
     volume_section = _format_volume_section(context)
+    execution_stats_section = ""
+    if execution_stats:
+        execution_stats_section = "\n## Execution History\n" + execution_stats
+
     return DECISION_PROMPT.format(
         instrument_name=context.instrument_name,
         symbol=context.symbol,
@@ -348,6 +356,7 @@ def build_decision_prompt(context: "SignalContext") -> str:
         strategy_signals_section=strategy_signals_section,
         sr_section=sr_section,
         volume_section=volume_section,
+        execution_stats_section=execution_stats_section,
     )
 
 
@@ -358,6 +367,7 @@ def build_position_management_prompt(
     current_stop: float,
     current_target: float,
     pnl_points: float,
+    execution_stats: str = "",
 ) -> str:
     """Build the position management prompt for an existing open position."""
     if context.news_headlines:
@@ -366,6 +376,10 @@ def build_position_management_prompt(
         news_section = ""
     strategy_signals_section = _format_strategy_signals(context.strategy_signals)
     sr_section = _format_sr_section(context)
+
+    execution_stats_section = ""
+    if execution_stats:
+        execution_stats_section = "\n## Execution History\n" + execution_stats
 
     pnl_direction = "profit" if pnl_points >= 0 else "loss"
 
@@ -383,6 +397,7 @@ def build_position_management_prompt(
         news_section=news_section,
         strategy_signals_section=strategy_signals_section,
         sr_section=sr_section,
+        execution_stats_section=execution_stats_section,
         position_direction=position_direction,
         entry_level=entry_level,
         current_stop=current_stop,
