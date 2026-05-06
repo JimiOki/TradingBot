@@ -186,26 +186,74 @@ def _fetch_open_positions_map(
     broker: IgBrokerAdapter | None,
     epic_map: dict[str, str],
 ) -> dict[str, dict]:
-    """Fetch open positions and return a lookup from epic → position dict.
+    """Fetch open positions AND working orders, return epic → position dict.
+
+    Working orders (unfilled LIMIT orders) are included so the bot doesn't
+    place duplicate orders for instruments that already have a pending order.
 
     For dry runs where the broker might not be connected, returns an empty dict.
     """
     if broker is None:
         return {}
 
+    pos_map: dict[str, dict] = {}
+
+    # 1. Filled positions
     try:
         positions = broker.fetch_positions()
+        for pos in positions:
+            epic = pos.get("epic", "")
+            if epic:
+                pos_map[epic] = pos
+        logger.info("Fetched %d open position(s).", len(positions))
     except Exception as exc:
         logger.warning("Could not fetch open positions: %s — defaulting to empty.", exc)
-        return {}
 
-    pos_map: dict[str, dict] = {}
-    for pos in positions:
-        epic = pos.get("epic", "")
-        if epic:
-            pos_map[epic] = pos
+    # 2. Working orders (unfilled LIMIT orders)
+    try:
+        working_orders = broker.fetch_working_orders()
+        for wo in working_orders:
+            epic = wo.get("epic", "")
+            if epic and epic not in pos_map:
+                # Treat working order like an open position so we don't duplicate
+                pos_map[epic] = {
+                    "deal_id": wo.get("deal_id", ""),
+                    "epic": epic,
+                    "direction": wo.get("direction", ""),
+                    "size": wo.get("size", 0),
+                    "open_level": wo.get("order_level", 0),
+                    "current_level": wo.get("order_level", 0),
+                    "pnl": 0,
+                    "instrument_name": wo.get("instrument_name", ""),
+                    "stop_level": None,
+                    "limit_level": None,
+                    "is_working_order": True,
+                }
+                logger.info("  Working order included: epic=%s direction=%s", epic, wo.get("direction"))
+    except Exception as exc:
+        logger.warning("Could not fetch working orders: %s — continuing without.", exc)
 
-    logger.info("Fetched %d open position(s).", len(pos_map))
+    # 3. Diagnostic: log which configured epics matched and which didn't
+    reverse_epic = {v: k for k, v in epic_map.items()}
+    matched = []
+    unmatched = []
+    for symbol, epic in epic_map.items():
+        if epic in pos_map:
+            matched.append(symbol)
+        else:
+            unmatched.append(symbol)
+    if matched:
+        logger.info("Positions matched: %s", ", ".join(matched))
+    if pos_map:
+        # Log any IG epics that didn't match any configured instrument
+        unknown_epics = [e for e in pos_map if e not in reverse_epic]
+        if unknown_epics:
+            logger.warning(
+                "IG returned positions with unknown epics (not in instruments.yaml): %s",
+                unknown_epics,
+            )
+
+    logger.info("Total position/order map: %d entries.", len(pos_map))
     return pos_map
 
 
@@ -299,6 +347,13 @@ def process_instrument(
     if llm_rec != "GO":
         # LLM says NO_GO or UNCERTAIN — if there's an open position, close it
         if existing_pos:
+            # Working orders: just note it — cancellation not yet implemented
+            if existing_pos.get("is_working_order"):
+                result["action"] = "HELD"
+                result["note"] = f"llm_recommendation={llm_rec!r} — working order pending (cancel not implemented)"
+                logger.info("  HELD %s — working order pending, LLM=%s", symbol, llm_rec)
+                return result
+
             pos_deal_id = existing_pos.get("deal_id", "")
             pos_direction = existing_pos.get("direction", "")
             pos_size = existing_pos.get("size", 0)
@@ -348,6 +403,13 @@ def process_instrument(
 
     # --- Position management: existing position + GO ---
     if existing_pos:
+        # If this is a working order (unfilled LIMIT), just hold — no management needed
+        if existing_pos.get("is_working_order"):
+            result["action"] = "HELD"
+            result["note"] = f"working order already pending (deal_id={existing_pos.get('deal_id', '')})"
+            logger.info("  HELD %s — working order already pending", symbol)
+            return result
+
         pos_direction = existing_pos.get("direction", "")  # BUY or SELL
         pos_deal_id = existing_pos.get("deal_id", "")
         pos_size = existing_pos.get("size", 0)

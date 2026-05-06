@@ -507,6 +507,66 @@ class IgBrokerAdapter(BrokerAdapter):
         return deal_ref
 
     # ------------------------------------------------------------------
+    # Working orders (unfilled LIMIT orders)
+    # ------------------------------------------------------------------
+
+    def fetch_working_orders(self) -> list[dict]:
+        """Return all working (unfilled) orders for the active IG account.
+
+        Calls GET /workingorders (v2) and returns a list of dicts with
+        epic, direction, size, deal_id, and order details.
+
+        Returns:
+            List of working-order dicts.  Returns ``[]`` on any failure.
+        """
+        try:
+            ig = self._session()
+
+            headers = dict(ig.session.headers)
+            headers["Version"] = "2"
+            headers["Accept"] = "application/json; charset=UTF-8"
+
+            resp = requests.get(
+                f"{ig.BASE_URL}/workingorders",
+                headers=headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            orders = data.get("workingOrders", [])
+            result: list[dict] = []
+            for wo in orders:
+                try:
+                    working = wo.get("workingOrderData", {})
+                    market = wo.get("marketData", {})
+
+                    epic = market.get("epic", "")
+                    deal_id = working.get("dealId", "")
+                    direction = working.get("direction", "").upper()
+                    size = float(working.get("size", 0) or 0)
+                    order_level = float(working.get("level", 0) or 0)
+                    instrument_name = market.get("instrumentName", "")
+
+                    result.append({
+                        "deal_id": deal_id,
+                        "epic": epic,
+                        "direction": direction,
+                        "size": size,
+                        "order_level": order_level,
+                        "instrument_name": instrument_name,
+                        "order_type": "WORKING_ORDER",
+                    })
+                except Exception as row_exc:
+                    logger.warning("Skipping malformed working order: %s", row_exc)
+
+            logger.info("Fetched %d working order(s)", len(result))
+            return result
+
+        except Exception as exc:
+            logger.warning("fetch_working_orders failed: %s", exc)
+            return []
+
+    # ------------------------------------------------------------------
     # Order placement
     # ------------------------------------------------------------------
 
