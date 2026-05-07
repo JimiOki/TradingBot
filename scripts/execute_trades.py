@@ -22,7 +22,8 @@ import argparse
 import json
 import logging
 import sys
-from datetime import date, datetime, timezone, timedelta
+import zoneinfo
+from datetime import date, datetime, time, timezone, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -147,6 +148,57 @@ def _build_min_size_map(instruments: list[dict]) -> dict[str, float]:
         inst["symbol"]: float(inst.get("ig_min_size", _MIN_SIZE))
         for inst in instruments
     }
+
+
+def _build_session_info(instruments: list[dict]) -> dict[str, dict]:
+    """Return {symbol: {timezone, open, close}} for market-hours filtering."""
+    info = {}
+    for inst in instruments:
+        symbol = inst["symbol"]
+        tz_name = inst.get("session_timezone", "UTC")
+        open_str = inst.get("session_open")
+        close_str = inst.get("session_close")
+        if open_str and close_str:
+            info[symbol] = {
+                "timezone": tz_name,
+                "open": time.fromisoformat(open_str),
+                "close": time.fromisoformat(close_str),
+            }
+    return info
+
+
+def _is_market_open(symbol: str, session_info: dict[str, dict], buffer_minutes: int = 60) -> bool:
+    """Check if a market is currently open (or within buffer of open/close).
+
+    Commodities with session_open > session_close (e.g. 18:00-17:00) are treated
+    as nearly-24h markets and always return True.
+
+    A buffer is applied so we trade shortly before/after the official session
+    (IG spreadbet markets often open slightly before the underlying).
+    """
+    if symbol not in session_info:
+        return True  # no session info → assume tradeable
+
+    info = session_info[symbol]
+    tz = zoneinfo.ZoneInfo(info["timezone"])
+    now_local = datetime.now(tz).time()
+    market_open = info["open"]
+    market_close = info["close"]
+
+    # Nearly-24h markets (open > close, e.g. 18:00 open, 17:00 close)
+    if market_open > market_close:
+        return True
+
+    # Apply buffer: expand the window
+    open_with_buffer = (
+        datetime.combine(date.today(), market_open) - timedelta(minutes=buffer_minutes)
+    ).time()
+    close_with_buffer = (
+        datetime.combine(date.today(), market_close) + timedelta(minutes=buffer_minutes)
+    ).time()
+
+    # Standard session: open < close (e.g. 09:00 - 17:30)
+    return open_with_buffer <= now_local <= close_with_buffer
 
 
 def _load_decision(symbol: str, signal_date: date) -> dict | None:
@@ -285,6 +337,7 @@ def process_instrument(
     price_factor_map: dict[str, float] | None = None,
     min_size_map: dict[str, float] | None = None,
     decision_service: DecisionService | None = None,
+    session_info: dict[str, dict] | None = None,
 ) -> dict:
     """Evaluate one snapshot row and optionally place an order.
 
@@ -564,6 +617,13 @@ def process_instrument(
                 result["note"] = f"failed to close opposite position {pos_deal_id} before flip: {exc}"
                 logger.error("  CLOSE FAILED %s — could not flip: %s", symbol, exc)
                 return result
+
+    # --- Market hours filter: only place NEW orders when market is open ---
+    if session_info and not _is_market_open(symbol, session_info):
+        result["action"] = "SKIPPED"
+        result["note"] = "market closed"
+        logger.info("  SKIPPED %s — market closed", symbol)
+        return result
 
     # --- Stop distance / limit distance from LLM absolute levels ---
     risk_pct = decision.get("risk_pct", 1.0)
@@ -999,11 +1059,12 @@ def main() -> None:
     # Staleness guard
     _check_staleness(snapshot)
 
-    # Load instruments config (for epic lookup)
+    # Load instruments config (for epic lookup and session hours)
     instruments = load_instruments(INSTRUMENTS_CONFIG)
     epic_map = _build_epic_map(instruments)
     price_factor_map = _build_price_factor_map(instruments)
     min_size_map = _build_min_size_map(instruments)
+    session_info = _build_session_info(instruments)
 
     # Filter to requested symbol if provided
     if args.symbol:
@@ -1060,6 +1121,7 @@ def main() -> None:
             price_factor_map=price_factor_map,
             min_size_map=min_size_map,
             decision_service=decision_service,
+            session_info=session_info,
         )
         results.append(result)
 
