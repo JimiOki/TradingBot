@@ -140,3 +140,77 @@ instruments:
     adjusted_prices: false
     ig_epic: "IX.D.DOW.DAILY.IP"     # Wall Street, undated DFB
     ig_sentiment_id: "WALL"
+
+  # --- Forex (majors) ---
+
+  - symbol: "EURUSD=X"
+    name: EUR/USD
+    asset_class: fx
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "17:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: "CS.D.EURUSD.TODAY.IP"
+    ig_sentiment_id: "EURUSD"
+    ig_price_factor: 10000            # Yahoo 1.1781 → IG 11781
+    ig_min_size: 0.5
+
+  - symbol: "GBPUSD=X"
+    name: GBP/USD
+    asset_class: fx
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "17:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: "CS.D.GBPUSD.TODAY.IP"
+    ig_sentiment_id: "GBPUSD"
+    ig_price_factor: 10000            # Yahoo 1.3627 → IG 13627
+    ig_min_size: 0.5
+
+  - symbol: "USDJPY=X"
+    name: USD/JPY
+    asset_class: fx
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "17:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: "CS.D.USDJPY.TODAY.IP"
+    ig_sentiment_id: "USDJPY"
+    ig_price_factor: 100              # Yahoo 156.65 → IG 15665
+    ig_min_size: 0.5
+
+  - symbol: "AUDUSD=X"
+    name: AUD/USD
+    asset_class: fx
+    timeframe: 1d
+    source: yfinance
+    session_timezone: America/New_York
+    session_open: "17:00"
+    session_close: "17:00"
+    adjusted_prices: false
+    ig_epic: "CS.D.AUDUSD.TODAY.IP"
+    ig_sentiment_id: "AUDUSD"
+    ig_price_factor: 10000            # Yahoo 0.7243 → IG 7243
+    ig_min_size: 0.5
+
+  # --- Crypto ---
+
+  - symbol: "BTC-USD"
+    name: Bitcoin
+    asset_class: fx
+    timeframe: 1d
+    source: yfinance
+    session_timezone: UTC
+    session_open: "00:00"
+    session_close: "00:00"
+    adjusted_prices: false
+    ig_epic: "CS.D.BITCOIN.TODAY.IP"
+    ig_sentiment_id: "BITCOIN"
+    ig_price_factor: 1                # Yahoo and IG both quote in USD
+    ig_min_size: 0.01

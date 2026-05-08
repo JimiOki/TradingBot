@@ -185,8 +185,8 @@ def _is_market_open(symbol: str, session_info: dict[str, dict], buffer_minutes: 
     market_open = info["open"]
     market_close = info["close"]
 
-    # Nearly-24h markets (open > close, e.g. 18:00 open, 17:00 close)
-    if market_open > market_close:
+    # Nearly-24h markets (open >= close, e.g. 18:00 open, 17:00 close; or 24/5 forex)
+    if market_open >= market_close:
         return True
 
     # Apply buffer: expand the window
