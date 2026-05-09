@@ -40,6 +40,7 @@ class GeminiClient(LLMClient):
         """Send a prompt to Gemini and return the completion text.
 
         Retries up to max_retries times on failure (free model, no cost).
+        Uses JSON response mode to prevent truncated/malformed JSON.
         """
         last_exc: Exception | None = None
         for attempt in range(1, max_retries + 1):
@@ -50,6 +51,7 @@ class GeminiClient(LLMClient):
                     contents=prompt,
                     config=genai_types.GenerateContentConfig(
                         max_output_tokens=self.max_tokens,
+                        response_mime_type="application/json",
                     ),
                 )
                 elapsed_ms = int((time.monotonic() - start) * 1000)
