@@ -150,8 +150,17 @@ def _build_min_size_map(instruments: list[dict]) -> dict[str, float]:
     }
 
 
+def _build_step_distance_map(instruments: list[dict]) -> dict[str, float]:
+    """Return {symbol: ig_step_distance} — level rounding for LIMIT orders."""
+    return {
+        inst["symbol"]: float(inst["ig_step_distance"])
+        for inst in instruments
+        if "ig_step_distance" in inst
+    }
+
+
 def _build_session_info(instruments: list[dict]) -> dict[str, dict]:
-    """Return {symbol: {timezone, open, close}} for market-hours filtering."""
+    """Return {symbol: {timezone, open, close, asset_class}} for market-hours filtering."""
     info = {}
     for inst in instruments:
         symbol = inst["symbol"]
@@ -163,6 +172,7 @@ def _build_session_info(instruments: list[dict]) -> dict[str, dict]:
                 "timezone": tz_name,
                 "open": time.fromisoformat(open_str),
                 "close": time.fromisoformat(close_str),
+                "asset_class": inst.get("asset_class", ""),
             }
     return info
 
@@ -171,7 +181,7 @@ def _is_market_open(symbol: str, session_info: dict[str, dict], buffer_minutes: 
     """Check if a market is currently open (or within buffer of open/close).
 
     Commodities with session_open > session_close (e.g. 18:00-17:00) are treated
-    as nearly-24h markets and always return True.
+    as nearly-24h markets but still respect weekends.
 
     A buffer is applied so we trade shortly before/after the official session
     (IG spreadbet markets often open slightly before the underlying).
@@ -181,7 +191,15 @@ def _is_market_open(symbol: str, session_info: dict[str, dict], buffer_minutes: 
 
     info = session_info[symbol]
     tz = zoneinfo.ZoneInfo(info["timezone"])
-    now_local = datetime.now(tz).time()
+    now_local = datetime.now(tz)
+    weekday = now_local.weekday()  # 0=Mon, 5=Sat, 6=Sun
+
+    # Weekend check: most markets closed Sat/Sun (crypto excluded)
+    asset_class = info.get("asset_class", "")
+    if weekday >= 5 and asset_class != "crypto":
+        return False
+
+    now_time = now_local.time()
     market_open = info["open"]
     market_close = info["close"]
 
@@ -338,6 +356,7 @@ def process_instrument(
     min_size_map: dict[str, float] | None = None,
     decision_service: DecisionService | None = None,
     session_info: dict[str, dict] | None = None,
+    step_distance_map: dict[str, float] | None = None,
 ) -> dict:
     """Evaluate one snapshot row and optionally place an order.
 
@@ -701,6 +720,12 @@ def process_instrument(
     limit_level: float | None = None
     if order_type == "LIMIT" and entry_level is not None:
         limit_level = round(float(entry_level) * ig_factor, 1)
+        # Snap to step distance if configured (e.g. BTC requires multiples of 20)
+        if step_distance_map is None:
+            step_distance_map = {}
+        step = step_distance_map.get(symbol)
+        if step and step > 0:
+            limit_level = round(limit_level / step) * step
 
     for attempt in range(1, max_attempts + 1):
         order = OrderRequest(
@@ -1065,6 +1090,7 @@ def main() -> None:
     price_factor_map = _build_price_factor_map(instruments)
     min_size_map = _build_min_size_map(instruments)
     session_info = _build_session_info(instruments)
+    step_distance_map = _build_step_distance_map(instruments)
 
     # Filter to requested symbol if provided
     if args.symbol:
@@ -1122,6 +1148,7 @@ def main() -> None:
             min_size_map=min_size_map,
             decision_service=decision_service,
             session_info=session_info,
+            step_distance_map=step_distance_map,
         )
         results.append(result)
 

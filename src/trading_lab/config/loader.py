@@ -23,7 +23,7 @@ _REQUIRED_FIELDS = [
     "adjusted_prices",
 ]
 
-_VALID_ASSET_CLASSES = {"commodity", "equity", "index", "fx"}
+_VALID_ASSET_CLASSES = {"commodity", "equity", "index", "fx", "crypto"}
 _VALID_TIMEFRAMES = {"1d", "1wk"}
 
 
