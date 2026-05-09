@@ -372,6 +372,7 @@ def process_instrument(
         "action": "SKIPPED",
         "note": "",
         "deal_ref": "",
+        "thinking": None,
     }
 
     # --- Filter: status ---
@@ -539,6 +540,8 @@ def process_instrument(
                         current_target=current_target,
                         pnl_points=pnl_points,
                     )
+
+                    result["thinking"] = mgmt.thinking
 
                     if mgmt.recommendation == "CLOSE":
                         # LLM wants to close
@@ -1015,6 +1018,7 @@ def _save_execution_log(
             "llm_recommendation": decision.get("llm_recommendation") if decision else None,
             "deal_ref": r.get("deal_ref", ""),
             "rationale": r.get("note", ""),
+            "thinking": r.get("thinking") or (decision.get("thinking") if decision else None),
         })
 
     new_df = pd.DataFrame(rows)

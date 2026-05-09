@@ -43,6 +43,7 @@ class LLMDecision:
     generated_at: datetime
     model: str
     cached: bool
+    thinking: str | None = None  # LLM reasoning chain (from Gemini thinking mode)
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,7 @@ class PositionManagementDecision:
     rationale: str
     generated_at: datetime
     model: str
+    thinking: str | None = None  # LLM reasoning chain
 
 
 class DecisionService:
@@ -93,6 +95,7 @@ class DecisionService:
                     generated_at=datetime.fromisoformat(data["generated_at"]),
                     model=data["model"],
                     cached=True,
+                    thinking=data.get("thinking"),
                 )
             except (KeyError, ValueError, OSError) as exc:
                 logger.warning("Decision cache read failed for %s: %s", cache_path, exc)
@@ -101,6 +104,7 @@ class DecisionService:
         prompt = build_decision_prompt(context, execution_stats=context.execution_stats)
         try:
             raw = self._client.complete(prompt)
+            thinking = getattr(self._client, "last_thinking", None)
             decision = self._parse_decision(raw)
         except (LLMError, LLMTimeoutError, ValueError) as exc:
             logger.warning("LLM decision failed for %s: %s", context.symbol, exc)
@@ -144,6 +148,7 @@ class DecisionService:
             generated_at=generated_at,
             model=getattr(self._client, "model", "stub"),
             cached=False,
+            thinking=thinking,
         )
 
         # Persist to cache
@@ -164,6 +169,7 @@ class DecisionService:
                 "conflicts_with_technical": result.conflicts_with_technical,
                 "generated_at": result.generated_at.isoformat(),
                 "model": result.model,
+                "thinking": result.thinking,
             }
             cache_path.write_text(json.dumps(cache_data, indent=2), encoding="utf-8")
         except OSError as exc:
@@ -282,9 +288,11 @@ class DecisionService:
         )
         # Retry once on JSON parse failure (truncated response)
         last_exc: Exception | None = None
+        thinking: str | None = None
         for attempt in range(2):
             try:
                 raw = self._client.complete(prompt)
+                thinking = getattr(self._client, "last_thinking", None)
                 parsed = self._parse_position_management(raw)
                 break
             except ValueError as exc:
@@ -315,6 +323,7 @@ class DecisionService:
             rationale=parsed.get("rationale", ""),
             generated_at=datetime.now(timezone.utc),
             model=getattr(self._client, "model", "stub"),
+            thinking=thinking,
         )
 
     def _parse_position_management(self, raw: str) -> dict:
