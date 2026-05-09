@@ -17,7 +17,11 @@ DEFAULT_MAX_TOKENS = 2000
 
 
 class GeminiClient(LLMClient):
-    """LLM client backed by the Google Gemini API (google-genai SDK v1+)."""
+    """LLM client backed by the Google Gemini API (google-genai SDK v1+).
+
+    Uses JSON response mode and captures thinking separately so the model's
+    reasoning chain doesn't corrupt the structured JSON output.
+    """
 
     def __init__(
         self,
@@ -35,14 +39,17 @@ class GeminiClient(LLMClient):
         self.timeout = timeout
         self.max_tokens = max_tokens
         self._client = genai.Client(api_key=api_key)
+        self.last_thinking: str | None = None  # captured reasoning from last call
 
     def complete(self, prompt: str, max_retries: int = 2) -> str:
         """Send a prompt to Gemini and return the completion text.
 
         Retries up to max_retries times on failure (free model, no cost).
-        Uses JSON response mode to prevent truncated/malformed JSON.
+        Uses JSON response mode with thinking enabled — the model's reasoning
+        is captured in self.last_thinking while only valid JSON is returned.
         """
         last_exc: Exception | None = None
+        self.last_thinking = None
         for attempt in range(1, max_retries + 1):
             start = time.monotonic()
             try:
@@ -52,14 +59,35 @@ class GeminiClient(LLMClient):
                     config=genai_types.GenerateContentConfig(
                         max_output_tokens=self.max_tokens,
                         response_mime_type="application/json",
+                        thinking_config=genai_types.ThinkingConfig(
+                            include_thoughts=True,
+                        ),
                     ),
                 )
                 elapsed_ms = int((time.monotonic() - start) * 1000)
+
+                # Extract thinking and output from response parts
+                thinking_parts = []
+                output_parts = []
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, "thought") and part.thought:
+                        thinking_parts.append(part.text)
+                    else:
+                        output_parts.append(part.text)
+
+                self.last_thinking = "\n".join(thinking_parts) if thinking_parts else None
+                output = "\n".join(output_parts) if output_parts else response.text
+
+                if self.last_thinking:
+                    logger.debug(
+                        "LLM thinking (%d chars): %.200s...",
+                        len(self.last_thinking), self.last_thinking,
+                    )
                 logger.debug(
                     "LLM call complete: model=%s elapsed_ms=%d attempt=%d",
                     self.model, elapsed_ms, attempt,
                 )
-                return response.text
+                return output
             except Exception as exc:
                 elapsed_ms = int((time.monotonic() - start) * 1000)
                 last_exc = exc
