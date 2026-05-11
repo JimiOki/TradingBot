@@ -216,7 +216,7 @@ def _is_market_open(symbol: str, session_info: dict[str, dict], buffer_minutes: 
     ).time()
 
     # Standard session: open < close (e.g. 09:00 - 17:30)
-    return open_with_buffer <= now_local <= close_with_buffer
+    return open_with_buffer <= now_time <= close_with_buffer
 
 
 def _load_decision(symbol: str, signal_date: date) -> dict | None:

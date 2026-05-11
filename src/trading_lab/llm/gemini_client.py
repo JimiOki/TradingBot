@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 DEFAULT_TIMEOUT = 30.0
-DEFAULT_MAX_TOKENS = 2000
+DEFAULT_MAX_TOKENS = 4096
 
 
 class GeminiClient(LLMClient):
@@ -61,6 +61,7 @@ class GeminiClient(LLMClient):
                         response_mime_type="application/json",
                         thinking_config=genai_types.ThinkingConfig(
                             include_thoughts=True,
+                            thinking_budget=1024,
                         ),
                     ),
                 )
