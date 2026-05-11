@@ -464,7 +464,7 @@ def _render_positions_panel() -> None:
             f":{rec_colour}[{rec}]"
         )
 
-        with st.expander(header, expanded=(rec != "HOLD")):
+        with st.expander(header, expanded=False):
             c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("Direction", direction)
             c2.metric("Entry", _fmt_price(entry))
@@ -572,7 +572,7 @@ def _render_signal_table(df: pd.DataFrame) -> None:
             f"{staleness_warn}"
         )
 
-        with st.expander(header, expanded=(label in ("Buy", "Sell"))):
+        with st.expander(header, expanded=False):
             if status == "data_missing":
                 st.warning("No curated data file found for this instrument.")
                 continue
@@ -675,7 +675,7 @@ def _render_signal_table(df: pd.DataFrame) -> None:
                 scol3.markdown(f":{bias_colour}[**{bias}**]")
                 st.progress(long_pct / 100)
 
-            with st.expander("LLM Analysis", expanded=True):
+            with st.expander("LLM Analysis", expanded=False):
                 is_flat = (row.get("signal") == 0 or row.get("signal") is None)
 
                 # --- News ---
