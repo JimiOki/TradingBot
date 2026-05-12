@@ -212,6 +212,53 @@ def build_output_paths(symbol: str, interval: str = "1d") -> tuple[Path, Path]:
     return RAW_DATA_DIR / file_name, CURATED_DATA_DIR / file_name
 
 
+def _fetch_yahoo_volume(symbol: str, max_bars: int) -> pd.Series | None:
+    """Fetch real exchange volume from Yahoo Finance.
+
+    Returns a Series indexed by date (UTC) with volume values,
+    or None if the fetch fails.
+    """
+    try:
+        import yfinance as yf
+
+        # Map max_bars to a yfinance period
+        if max_bars <= 30:
+            period = "1mo"
+        elif max_bars <= 90:
+            period = "3mo"
+        elif max_bars <= 180:
+            period = "6mo"
+        elif max_bars <= 365:
+            period = "1y"
+        else:
+            period = "2y"
+
+        df = yf.download(symbol, period=period, interval="1d", progress=False)
+        if df.empty:
+            return None
+
+        # Flatten MultiIndex columns if present
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [col[0] for col in df.columns]
+
+        if "Volume" not in df.columns:
+            return None
+
+        vol = df["Volume"].copy()
+        vol.index = pd.to_datetime(vol.index)
+        if vol.index.tz is None:
+            vol.index = vol.index.tz_localize("UTC")
+        else:
+            vol.index = vol.index.tz_convert("UTC")
+        # Normalize to date-only for matching (drop time component)
+        vol.index = vol.index.normalize()
+        vol.index.name = "timestamp"
+        return vol
+    except Exception as exc:
+        logger.debug("Yahoo volume fetch failed for %s: %s", symbol, exc)
+        return None
+
+
 def ingest_ig_daily(
     symbol: str,
     epic: str,
@@ -220,6 +267,10 @@ def ingest_ig_daily(
     headers: dict | None = None,
 ) -> tuple[Path, Path, pd.DataFrame]:
     """Download, normalize, and persist IG daily data.
+
+    OHLC prices come from IG (bid/ask midpoints). Volume is overlaid
+    from Yahoo Finance (real exchange volume) when available, falling
+    back to IG's platform volume.
 
     Args:
         symbol: Instrument symbol (e.g. 'GC=F').
@@ -238,6 +289,22 @@ def ingest_ig_daily(
     raw_df.to_parquet(raw_path)
 
     curated_df = normalize_ig_daily(raw_df, symbol=symbol)
+
+    # Overlay real exchange volume from Yahoo
+    yahoo_vol = _fetch_yahoo_volume(symbol, max_bars)
+    if yahoo_vol is not None:
+        # Match on normalized date (IG timestamps may have time components)
+        curated_dates = curated_df.index.normalize()
+        matched = 0
+        for i, dt in enumerate(curated_dates):
+            if dt in yahoo_vol.index:
+                curated_df.iloc[i, curated_df.columns.get_loc("volume")] = float(yahoo_vol[dt])
+                matched += 1
+        if matched > 0:
+            logger.info("  Overlaid Yahoo volume for %s: %d/%d bars matched", symbol, matched, len(curated_df))
+        else:
+            logger.debug("  No Yahoo volume dates matched for %s", symbol)
+
     curated_df.to_parquet(curated_path, index=True)
 
     return raw_path, curated_path, curated_df
