@@ -134,14 +134,6 @@ def _build_epic_map(instruments: list[dict]) -> dict[str, str]:
     }
 
 
-def _build_price_factor_map(instruments: list[dict]) -> dict[str, float]:
-    """Return {symbol: ig_price_factor} — multiplier from Yahoo price scale to IG points."""
-    return {
-        inst["symbol"]: float(inst.get("ig_price_factor", 1))
-        for inst in instruments
-    }
-
-
 def _build_min_size_map(instruments: list[dict]) -> dict[str, float]:
     """Return {symbol: ig_min_size} — per-instrument minimum deal size from IG."""
     return {
@@ -352,7 +344,6 @@ def process_instrument(
     broker: IgBrokerAdapter | None,
     capital: float,
     open_positions: dict[str, dict] | None = None,
-    price_factor_map: dict[str, float] | None = None,
     min_size_map: dict[str, float] | None = None,
     decision_service: DecisionService | None = None,
     session_info: dict[str, dict] | None = None,
@@ -562,12 +553,7 @@ def process_instrument(
                         new_stop = mgmt.stop_loss
                         new_target = mgmt.take_profit
 
-                        # Apply price factor for IG
-                        if price_factor_map is None:
-                            price_factor_map = {}
-                        ig_factor = price_factor_map.get(symbol, 1.0)
-
-                        # Stop ratchet validation (in Yahoo price space, before IG scaling)
+                        # Stop ratchet validation
                         if new_stop is not None and current_stop:
                             if llm_direction == "LONG" and new_stop < current_stop:
                                 logger.warning("  %s — stop ratchet: rejecting stop %.4f < current %.4f for LONG", symbol, new_stop, current_stop)
@@ -576,9 +562,9 @@ def process_instrument(
                                 logger.warning("  %s — stop ratchet: rejecting stop %.4f > current %.4f for SHORT", symbol, new_stop, current_stop)
                                 new_stop = None  # reject — can't widen stop on short
 
-                        # Convert to IG price scale
-                        ig_stop = round(new_stop * ig_factor, 1) if new_stop else None
-                        ig_target = round(new_target * ig_factor, 1) if new_target else None
+                        # Prices are already in IG scale (sourced from IG)
+                        ig_stop = round(new_stop, 1) if new_stop else None
+                        ig_target = round(new_target, 1) if new_target else None
 
                         if ig_stop is not None or ig_target is not None:
                             try:
@@ -674,13 +660,6 @@ def process_instrument(
         # Fallback: 2x stop distance
         limit_distance = stop_distance * 2.0
 
-    # --- Scale distances from Yahoo price units to IG points ---
-    if price_factor_map is None:
-        price_factor_map = {}
-    ig_factor = price_factor_map.get(symbol, 1.0)
-    stop_distance = stop_distance * ig_factor
-    limit_distance = limit_distance * ig_factor
-
     # --- Round distances to 1 decimal place (IG rejects excessive precision) ---
     stop_distance = round(stop_distance, 1)
     limit_distance = round(limit_distance, 1)
@@ -719,10 +698,10 @@ def process_instrument(
     max_attempts = 3
     current_size = size
 
-    # For LIMIT orders, compute the entry level in IG's point scale
+    # For LIMIT orders, use the entry level directly (already in IG scale)
     limit_level: float | None = None
     if order_type == "LIMIT" and entry_level is not None:
-        limit_level = round(float(entry_level) * ig_factor, 1)
+        limit_level = round(float(entry_level), 1)
         # Snap to step distance if configured (e.g. BTC requires multiples of 20)
         if step_distance_map is None:
             step_distance_map = {}
@@ -1091,7 +1070,6 @@ def main() -> None:
     # Load instruments config (for epic lookup and session hours)
     instruments = load_instruments(INSTRUMENTS_CONFIG)
     epic_map = _build_epic_map(instruments)
-    price_factor_map = _build_price_factor_map(instruments)
     min_size_map = _build_min_size_map(instruments)
     session_info = _build_session_info(instruments)
     step_distance_map = _build_step_distance_map(instruments)
@@ -1148,7 +1126,6 @@ def main() -> None:
             broker=broker,
             capital=capital,
             open_positions=open_positions,
-            price_factor_map=price_factor_map,
             min_size_map=min_size_map,
             decision_service=decision_service,
             session_info=session_info,

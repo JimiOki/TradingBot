@@ -2,14 +2,14 @@
 
 Usage:
     python scripts/ingest_market_data.py
-    python scripts/ingest_market_data.py --period 1y
+    python scripts/ingest_market_data.py --max-bars 200
     python scripts/ingest_market_data.py --symbol GC=F
 
 This script:
 1. Reads all instruments from config/instruments.yaml
-2. Downloads daily OHLCV data from yfinance for each
-3. Saves raw data to data/raw/<symbol>_1d_yfinance.parquet
-4. Saves curated data to data/curated/<symbol>_1d_yfinance.parquet
+2. Downloads daily OHLCV data from IG REST API for each (bid/ask midpoints)
+3. Saves raw data to data/raw/<symbol>_1d_ig.parquet
+4. Saves curated data to data/curated/<symbol>_1d_ig.parquet
 5. Logs success/failure for each instrument
 
 Run this daily after market close to keep data fresh.
@@ -25,9 +25,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
+from dotenv import load_dotenv
+load_dotenv(ROOT / ".env")
+
 from trading_lab.config.loader import load_instruments
-from trading_lab.data.models import MarketDataRequest
-from trading_lab.data.yfinance_ingest import ingest_yfinance_daily
+from trading_lab.data.ig_ingest import _get_ig_session, ingest_ig_daily
 from trading_lab.logging_config import setup_logging
 from trading_lab.paths import INSTRUMENTS_CONFIG, ensure_data_dirs
 
@@ -35,24 +37,31 @@ setup_logging()
 logger = logging.getLogger("ingest")
 
 
-
-
-def ingest_instrument(instrument: dict, period: str) -> bool:
-    """Ingest a single instrument. Returns True on success, False on failure."""
+def ingest_instrument(
+    instrument: dict,
+    max_bars: int,
+    base_url: str,
+    headers: dict,
+) -> bool:
+    """Ingest a single instrument from IG. Returns True on success."""
     symbol = instrument["symbol"]
     name = instrument.get("name", symbol)
-    adjusted = instrument.get("adjusted_prices", False)
+    epic = instrument.get("ig_epic", "")
 
-    logger.info("Ingesting %s (%s) — period=%s", name, symbol, period)
+    if not epic:
+        logger.warning("  ✗ %s — no ig_epic configured, skipping", symbol)
+        return False
+
+    logger.info("Ingesting %s (%s) — epic=%s max_bars=%d", name, symbol, epic, max_bars)
 
     try:
-        request = MarketDataRequest(
+        raw_path, curated_path, df = ingest_ig_daily(
             symbol=symbol,
-            period=period,
-            interval="1d",
-            adjusted=adjusted,
+            epic=epic,
+            max_bars=max_bars,
+            base_url=base_url,
+            headers=headers,
         )
-        raw_path, curated_path, df = ingest_yfinance_daily(request)
         logger.info(
             "  ✓ %s — %d bars, %s → %s",
             symbol,
@@ -70,11 +79,12 @@ def ingest_instrument(instrument: dict, period: str) -> bool:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ingest market data for all instruments.")
+    parser = argparse.ArgumentParser(description="Ingest market data from IG for all instruments.")
     parser.add_argument(
-        "--period",
-        default="2y",
-        help="yfinance period string (default: 2y). Options: 1mo, 3mo, 6mo, 1y, 2y, 5y, max",
+        "--max-bars",
+        type=int,
+        default=500,
+        help="Maximum number of daily bars to fetch per instrument (default: 500).",
     )
     parser.add_argument(
         "--symbol",
@@ -96,12 +106,19 @@ def main() -> None:
             logger.error("Symbol %s not found in instruments.yaml", args.symbol)
             sys.exit(1)
 
-    logger.info("Starting ingestion — %d instrument(s), period=%s", len(instruments), args.period)
+    # Create a single IG session for all instruments (avoid re-authenticating per instrument)
+    try:
+        base_url, headers = _get_ig_session()
+    except Exception as exc:
+        logger.error("Failed to create IG session: %s", exc)
+        sys.exit(1)
+
+    logger.info("Starting ingestion — %d instrument(s), max_bars=%d", len(instruments), args.max_bars)
     logger.info("=" * 60)
 
     results = []
     for instrument in instruments:
-        success = ingest_instrument(instrument, period=args.period)
+        success = ingest_instrument(instrument, args.max_bars, base_url, headers)
         results.append((instrument["symbol"], success))
 
     logger.info("=" * 60)

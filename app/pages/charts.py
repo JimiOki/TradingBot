@@ -47,8 +47,13 @@ def curated_path(symbol: str, timeframe: str, source: str) -> Path:
 
 
 def load_curated_bars(symbol: str, timeframe: str, source: str) -> pd.DataFrame | None:
-    """Load curated OHLCV bars from disk. Returns None if file absent."""
-    path = curated_path(symbol, timeframe, source)
+    """Load curated OHLCV bars from disk. Returns None if file absent.
+
+    Tries IG-sourced data first, falls back to the specified source.
+    """
+    path = curated_path(symbol, timeframe, "ig")
+    if not path.exists():
+        path = curated_path(symbol, timeframe, source)
     if not path.exists():
         return None
     df = pd.read_parquet(path)
