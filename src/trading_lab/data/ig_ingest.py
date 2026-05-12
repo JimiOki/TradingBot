@@ -26,6 +26,10 @@ _IG_DEMO_URL = "https://demo-api.ig.com/gateway/deal"
 def _get_ig_session() -> tuple[str, dict]:
     """Authenticate with IG and return (base_url, headers).
 
+    Uses v3 session which returns an OAuth Bearer token. The configured
+    IG_LIVE_ACCOUNT_ID is sent as IG-ACCOUNT-ID header (the default
+    account from the session may be a stockbroking account).
+
     Prefers LIVE credentials (IG_LIVE_*) for data fetching.
     Falls back to demo credentials if live are not set.
     """
@@ -33,6 +37,7 @@ def _get_ig_session() -> tuple[str, dict]:
     api_key = os.environ.get("IG_LIVE_API_KEY", "")
     username = os.environ.get("IG_LIVE_USERNAME", "")
     password = os.environ.get("IG_LIVE_PASSWORD", "")
+    account_id = os.environ.get("IG_LIVE_ACCOUNT_ID", "")
     base_url = _IG_LIVE_URL
 
     if not all([api_key, username, password]):
@@ -40,6 +45,7 @@ def _get_ig_session() -> tuple[str, dict]:
         api_key = os.environ.get("IG_API_KEY", "")
         username = os.environ.get("IG_USERNAME", "")
         password = os.environ.get("IG_PASSWORD", "")
+        account_id = os.environ.get("IG_ACCOUNT_ID", "")
         base_url = _IG_DEMO_URL if os.environ.get("IG_DEMO", "").lower() == "true" else _IG_LIVE_URL
 
     if not all([api_key, username, password]):
@@ -48,7 +54,7 @@ def _get_ig_session() -> tuple[str, dict]:
             "or IG_API_KEY/IG_USERNAME/IG_PASSWORD in .env"
         )
 
-    # Create session (v3 auth)
+    # Create session (v3 auth — returns OAuth token)
     auth_headers = {
         "X-IG-API-KEY": api_key,
         "Content-Type": "application/json; charset=UTF-8",
@@ -62,21 +68,26 @@ def _get_ig_session() -> tuple[str, dict]:
 
     resp = requests.post(f"{base_url}/session", json=auth_body, headers=auth_headers)
     resp.raise_for_status()
+    data = resp.json()
 
-    # Extract tokens from response headers
-    cst = resp.headers.get("CST", "")
-    security_token = resp.headers.get("X-SECURITY-TOKEN", "")
+    # v3 returns OAuth token in response body
+    oauth = data.get("oauthToken", {})
+    token_type = oauth.get("token_type", "Bearer")
+    access_token = oauth.get("access_token", "")
 
-    # Also check for OAuth token in response body
+    # Use configured account ID, falling back to session default
+    if not account_id:
+        account_id = data.get("accountId", "")
+
     session_headers = {
         "X-IG-API-KEY": api_key,
-        "CST": cst,
-        "X-SECURITY-TOKEN": security_token,
+        "Authorization": f"{token_type} {access_token}",
+        "IG-ACCOUNT-ID": account_id,
         "Content-Type": "application/json; charset=UTF-8",
         "Accept": "application/json; charset=UTF-8",
     }
 
-    logger.info("IG session created for data ingestion (base_url=%s)", base_url)
+    logger.info("IG session created for data ingestion (base_url=%s, account=%s)", base_url, account_id)
     return base_url, session_headers
 
 
