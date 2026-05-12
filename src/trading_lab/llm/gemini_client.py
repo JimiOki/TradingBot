@@ -41,29 +41,33 @@ class GeminiClient(LLMClient):
         self._client = genai.Client(api_key=api_key)
         self.last_thinking: str | None = None  # captured reasoning from last call
 
-    def complete(self, prompt: str, max_retries: int = 2) -> str:
+    def complete(self, prompt: str, json_mode: bool = False, max_retries: int = 2) -> str:
         """Send a prompt to Gemini and return the completion text.
 
         Retries up to max_retries times on failure (free model, no cost).
-        Uses JSON response mode with thinking enabled — the model's reasoning
-        is captured in self.last_thinking while only valid JSON is returned.
+        When json_mode=True, uses JSON response mode so the model returns
+        valid JSON. Thinking is always enabled — the model's reasoning
+        is captured in self.last_thinking.
         """
         last_exc: Exception | None = None
         self.last_thinking = None
         for attempt in range(1, max_retries + 1):
             start = time.monotonic()
             try:
+                config_kwargs = {
+                    "max_output_tokens": self.max_tokens,
+                    "thinking_config": genai_types.ThinkingConfig(
+                        include_thoughts=True,
+                        thinking_budget=1024,
+                    ),
+                }
+                if json_mode:
+                    config_kwargs["response_mime_type"] = "application/json"
+
                 response = self._client.models.generate_content(
                     model=self.model,
                     contents=prompt,
-                    config=genai_types.GenerateContentConfig(
-                        max_output_tokens=self.max_tokens,
-                        response_mime_type="application/json",
-                        thinking_config=genai_types.ThinkingConfig(
-                            include_thoughts=True,
-                            thinking_budget=1024,
-                        ),
-                    ),
+                    config=genai_types.GenerateContentConfig(**config_kwargs),
                 )
                 elapsed_ms = int((time.monotonic() - start) * 1000)
 

@@ -6,11 +6,12 @@ class LLMClient(ABC):
     """Abstract LLM client. All concrete clients must implement complete()."""
 
     @abstractmethod
-    def complete(self, prompt: str) -> str:
+    def complete(self, prompt: str, json_mode: bool = False) -> str:
         """Send a prompt and return the completion text.
 
         Args:
             prompt: The full prompt string to send to the LLM.
+            json_mode: If True, request structured JSON output from the model.
 
         Returns:
             The completion text as a plain string.

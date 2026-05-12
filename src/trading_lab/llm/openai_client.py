@@ -35,7 +35,7 @@ class OpenAIClient(LLMClient):
         self.max_tokens = max_tokens
         self._client = openai.OpenAI(api_key=api_key)
 
-    def complete(self, prompt: str) -> str:
+    def complete(self, prompt: str, json_mode: bool = False) -> str:
         """Send a prompt to OpenAI and return the completion text."""
         start = time.monotonic()
         try:

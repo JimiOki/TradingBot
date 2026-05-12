@@ -103,7 +103,7 @@ class DecisionService:
         # Cache miss — call LLM
         prompt = build_decision_prompt(context, execution_stats=context.execution_stats)
         try:
-            raw = self._client.complete(prompt)
+            raw = self._client.complete(prompt, json_mode=True)
             thinking = getattr(self._client, "last_thinking", None)
             decision = self._parse_decision(raw)
         except (LLMError, LLMTimeoutError, ValueError) as exc:
@@ -291,7 +291,7 @@ class DecisionService:
         thinking: str | None = None
         for attempt in range(2):
             try:
-                raw = self._client.complete(prompt)
+                raw = self._client.complete(prompt, json_mode=True)
                 thinking = getattr(self._client, "last_thinking", None)
                 parsed = self._parse_position_management(raw)
                 break
