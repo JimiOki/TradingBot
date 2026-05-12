@@ -200,18 +200,18 @@ instruments:
     ig_min_size: 0.5
 
   # --- Crypto ---
-
-  - symbol: "BTC-USD"
-    name: Bitcoin
-    asset_class: crypto
-    timeframe: 1d
-    source: yfinance
-    session_timezone: UTC
-    session_open: "00:00"
-    session_close: "00:00"
-    adjusted_prices: false
-    ig_epic: "CS.D.BITCOIN.TODAY.IP"
-    ig_sentiment_id: "BITCOIN"
-    ig_price_factor: 1                # Yahoo and IG both quote in USD
-    ig_min_size: 0.01
-    ig_step_distance: 20              # IG requires levels in multiples of 20
+  # Disabled: FCA bans crypto derivatives for UK retail accounts on IG
+  # - symbol: "BTC-USD"
+  #   name: Bitcoin
+  #   asset_class: crypto
+  #   timeframe: 1d
+  #   source: yfinance
+  #   session_timezone: UTC
+  #   session_open: "00:00"
+  #   session_close: "00:00"
+  #   adjusted_prices: false
+  #   ig_epic: "CS.D.BITCOIN.TODAY.IP"
+  #   ig_sentiment_id: "BITCOIN"
+  #   ig_price_factor: 1                # Yahoo and IG both quote in USD
+  #   ig_min_size: 0.01
+  #   ig_step_distance: 20              # IG requires levels in multiples of 20
