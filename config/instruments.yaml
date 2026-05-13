@@ -157,19 +157,20 @@ instruments:
     ig_price_factor: 10000            # Yahoo 1.1781 → IG 11781
     ig_min_size: 0.5
 
-  - symbol: "GBPUSD=X"
-    name: GBP/USD
-    asset_class: fx
-    timeframe: 1d
-    source: yfinance
-    session_timezone: America/New_York
-    session_open: "17:00"
-    session_close: "17:00"
-    adjusted_prices: false
-    ig_epic: "CS.D.GBPUSD.TODAY.IP"
-    ig_sentiment_id: "GBPUSD"
-    ig_price_factor: 10000            # Yahoo 1.3627 → IG 13627
-    ig_min_size: 0.5
+  # Disabled: too correlated with EUR/USD (both are USD-weakness bets)
+  # - symbol: "GBPUSD=X"
+  #   name: GBP/USD
+  #   asset_class: fx
+  #   timeframe: 1d
+  #   source: yfinance
+  #   session_timezone: America/New_York
+  #   session_open: "17:00"
+  #   session_close: "17:00"
+  #   adjusted_prices: false
+  #   ig_epic: "CS.D.GBPUSD.TODAY.IP"
+  #   ig_sentiment_id: "GBPUSD"
+  #   ig_price_factor: 10000            # Yahoo 1.3627 → IG 13627
+  #   ig_min_size: 0.5
 
   - symbol: "USDJPY=X"
     name: USD/JPY
@@ -185,19 +186,20 @@ instruments:
     ig_price_factor: 100              # Yahoo 156.65 → IG 15665
     ig_min_size: 0.5
 
-  - symbol: "AUDUSD=X"
-    name: AUD/USD
-    asset_class: fx
-    timeframe: 1d
-    source: yfinance
-    session_timezone: America/New_York
-    session_open: "17:00"
-    session_close: "17:00"
-    adjusted_prices: false
-    ig_epic: "CS.D.AUDUSD.TODAY.IP"
-    ig_sentiment_id: "AUDUSD"
-    ig_price_factor: 10000            # Yahoo 0.7243 → IG 7243
-    ig_min_size: 0.5
+  # Disabled: too correlated with EUR/USD (both are USD-weakness bets)
+  # - symbol: "AUDUSD=X"
+  #   name: AUD/USD
+  #   asset_class: fx
+  #   timeframe: 1d
+  #   source: yfinance
+  #   session_timezone: America/New_York
+  #   session_open: "17:00"
+  #   session_close: "17:00"
+  #   adjusted_prices: false
+  #   ig_epic: "CS.D.AUDUSD.TODAY.IP"
+  #   ig_sentiment_id: "AUDUSD"
+  #   ig_price_factor: 10000            # Yahoo 0.7243 → IG 7243
+  #   ig_min_size: 0.5
 
   # --- Crypto ---
   # Disabled: FCA bans crypto derivatives for UK retail accounts on IG
