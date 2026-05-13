@@ -160,16 +160,11 @@ def curated_path_for(symbol: str, timeframe: str, source: str) -> Path:
 
 
 def _load_bars(instrument: dict) -> pd.DataFrame | None:
-    """Load curated bars for an instrument. Returns None if file is missing.
-
-    Tries IG-sourced data first, falls back to yfinance for backwards compat.
-    """
+    """Load curated bars for an instrument. Returns None if file is missing."""
     symbol = instrument["symbol"]
     timeframe = instrument.get("timeframe", "1d")
-    # Prefer IG data, fall back to yfinance
-    curated = curated_path_for(symbol, timeframe, "ig")
-    if not curated.exists():
-        curated = curated_path_for(symbol, timeframe, "yfinance")
+    source = instrument.get("source", "yfinance")
+    curated = curated_path_for(symbol, timeframe, source)
 
     if not curated.exists():
         logger.warning("  ✗ %s — curated file not found: %s", symbol, curated)
@@ -388,11 +383,9 @@ def process_instrument(instrument: dict, strategy, explanation_svc: ExplanationS
     symbol = instrument["symbol"]
     name = instrument.get("name", symbol)
     timeframe = instrument.get("timeframe", "1d")
+    source = instrument.get("source", "yfinance")
 
-    # Prefer IG data, fall back to yfinance
-    curated = curated_path_for(symbol, timeframe, "ig")
-    if not curated.exists():
-        curated = curated_path_for(symbol, timeframe, "yfinance")
+    curated = curated_path_for(symbol, timeframe, source)
 
     # --- Missing data case (REQ-WATCH-002) ---
     if not curated.exists():
