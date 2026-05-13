@@ -5,14 +5,19 @@ Usage:
     python scripts/ingest_market_data.py --max-bars 200
     python scripts/ingest_market_data.py --symbol GC=F
 
-This script:
-1. Reads all instruments from config/instruments.yaml
-2. Downloads daily OHLCV data from IG REST API for each (bid/ask midpoints)
-3. Saves raw data to data/raw/<symbol>_1d_ig.parquet
-4. Saves curated data to data/curated/<symbol>_1d_ig.parquet
-5. Logs success/failure for each instrument
+Primary source is IG REST API (bid/ask midpoints). If IG fails (403 rate
+limit, auth error, etc.) the script falls back to Yahoo Finance so the
+pipeline never stalls.
 
-Run this daily after market close to keep data fresh.
+Default --max-bars is 10 for daily cron runs (appends to existing history).
+Use --max-bars 500 for initial bulk loads.
+
+Output:
+    data/raw/<symbol>_1d_ig.parquet     (IG raw data)
+    data/curated/<symbol>_1d_ig.parquet (normalised bars)
+    — or on fallback —
+    data/raw/<symbol>_1d_yfinance.parquet
+    data/curated/<symbol>_1d_yfinance.parquet
 """
 import argparse
 import logging
@@ -30,6 +35,8 @@ load_dotenv(ROOT / ".env")
 
 from trading_lab.config.loader import load_instruments
 from trading_lab.data.ig_ingest import _get_ig_session, ingest_ig_daily
+from trading_lab.data.models import MarketDataRequest
+from trading_lab.data.yfinance_ingest import ingest_yfinance_daily
 from trading_lab.logging_config import setup_logging
 from trading_lab.paths import INSTRUMENTS_CONFIG, ensure_data_dirs
 
@@ -37,20 +44,42 @@ setup_logging()
 logger = logging.getLogger("ingest")
 
 
+def _ingest_via_yahoo(instrument: dict) -> bool:
+    """Fallback: ingest via Yahoo Finance. Returns True on success."""
+    symbol = instrument["symbol"]
+    adjusted = instrument.get("adjusted_prices", False)
+    try:
+        request = MarketDataRequest(
+            symbol=symbol,
+            period="2y",
+            interval="1d",
+            adjusted=adjusted,
+        )
+        raw_path, curated_path, df = ingest_yfinance_daily(request)
+        logger.info(
+            "  ✓ %s (Yahoo fallback) — %d bars, %s → %s",
+            symbol, len(df), df.index.min().date(), df.index.max().date(),
+        )
+        return True
+    except Exception as exc:
+        logger.error("  ✗ %s — Yahoo fallback also FAILED: %s", symbol, exc)
+        return False
+
+
 def ingest_instrument(
     instrument: dict,
     max_bars: int,
-    base_url: str,
-    headers: dict,
+    base_url: str | None,
+    headers: dict | None,
 ) -> bool:
-    """Ingest a single instrument from IG. Returns True on success."""
+    """Ingest a single instrument. Tries IG first, falls back to Yahoo."""
     symbol = instrument["symbol"]
     name = instrument.get("name", symbol)
     epic = instrument.get("ig_epic", "")
 
     if not epic:
-        logger.warning("  ✗ %s — no ig_epic configured, skipping", symbol)
-        return False
+        logger.warning("  %s — no ig_epic, using Yahoo", symbol)
+        return _ingest_via_yahoo(instrument)
 
     logger.info("Ingesting %s (%s) — epic=%s max_bars=%d", name, symbol, epic, max_bars)
 
@@ -64,27 +93,23 @@ def ingest_instrument(
         )
         logger.info(
             "  ✓ %s — %d bars, %s → %s",
-            symbol,
-            len(df),
-            df.index.min().date(),
-            df.index.max().date(),
+            symbol, len(df), df.index.min().date(), df.index.max().date(),
         )
-        logger.info("    Raw:     %s", raw_path)
-        logger.info("    Curated: %s", curated_path)
         return True
 
     except Exception as e:
-        logger.error("  ✗ %s — FAILED: %s", symbol, e)
-        return False
+        logger.warning("  ✗ %s — IG failed: %s — falling back to Yahoo", symbol, e)
+        return _ingest_via_yahoo(instrument)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ingest market data from IG for all instruments.")
+    parser = argparse.ArgumentParser(description="Ingest market data for all instruments.")
     parser.add_argument(
         "--max-bars",
         type=int,
-        default=500,
-        help="Maximum number of daily bars to fetch per instrument (default: 500).",
+        default=10,
+        help="Maximum number of daily bars to fetch from IG (default: 10). "
+             "Use 500 for initial bulk load.",
     )
     parser.add_argument(
         "--symbol",
@@ -106,12 +131,13 @@ def main() -> None:
             logger.error("Symbol %s not found in instruments.yaml", args.symbol)
             sys.exit(1)
 
-    # Create a single IG session for all instruments (avoid re-authenticating per instrument)
+    # Create a single IG session for all instruments
+    base_url: str | None = None
+    headers: dict | None = None
     try:
         base_url, headers = _get_ig_session()
     except Exception as exc:
-        logger.error("Failed to create IG session: %s", exc)
-        sys.exit(1)
+        logger.warning("Failed to create IG session: %s — will use Yahoo for all", exc)
 
     logger.info("Starting ingestion — %d instrument(s), max_bars=%d", len(instruments), args.max_bars)
     logger.info("=" * 60)
