@@ -96,9 +96,15 @@ all of it, reach a conviction, and specify the trade parameters if acting.
 {news_section}
 
 ## How to reason
-- Weigh the technical consensus, news catalysts, and sentiment together — no single input wins automatically
-- Review your execution history if available — it shows whether your stops, order types, and hold times have been effective on this instrument. Adjust mechanics, not conviction.
-- A strong macro catalyst in the news can justify a direction that conflicts with weak technicals, and vice versa
+- Your DEFAULT recommendation is NO_GO. You need a compelling reason to override this default.
+- The technical consensus is the primary signal. If fewer than 2 out of 6 strategies agree on a direction, \
+  the technicals are NEUTRAL and you should almost certainly say NO_GO. A news headline alone is NOT \
+  sufficient to justify a GO when technicals are flat — markets price in news faster than you can act.
+- Only recommend GO when: (a) multiple strategies agree on direction, AND (b) either news/sentiment \
+  confirms or at least does not contradict the technical picture
+- Review your execution history if available — it shows whether your stops, order types, and hold times \
+  have been effective on this instrument. If your win rate on this instrument is below 40%, require \
+  even stronger conviction before recommending GO.
 - If IG client sentiment strongly opposes your intended direction (>70% on the other side), note it — \
   it may be a contrarian signal or a warning
 - UNCERTAIN should only be used when evidence genuinely pulls equally in both directions — be decisive

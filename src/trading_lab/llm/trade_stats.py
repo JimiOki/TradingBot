@@ -4,6 +4,27 @@ from pathlib import Path
 
 import pandas as pd
 
+# Yahoo symbol → IG instrument name keywords for transaction matching.
+# IG transaction names (e.g. "Oil - US Crude", "Spot Gold") don't contain
+# the Yahoo symbol (e.g. "CL=F", "GC=F"), so we need an explicit mapping.
+_SYMBOL_TO_IG_KEYWORDS: dict[str, list[str]] = {
+    "GC=F": ["spot gold", "gold"],
+    "CL=F": ["oil - us crude", "us crude"],
+    "SI=F": ["spot silver", "silver"],
+    "HG=F": ["copper"],
+    "NG=F": ["natural gas"],
+    "^FTSE": ["ftse 100"],
+    "^GSPC": ["us 500", "s&p 500"],
+    "^NDX": ["us tech 100", "nasdaq"],
+    "^GDAXI": ["germany 40", "dax"],
+    "^N225": ["japan 225", "nikkei"],
+    "^DJI": ["wall street", "dow"],
+    "EURUSD=X": ["eur/usd"],
+    "USDJPY=X": ["usd/jpy"],
+    "GBPUSD=X": ["gbp/usd"],
+    "AUDUSD=X": ["aud/usd"],
+}
+
 
 def build_instrument_stats(
     symbol: str,
@@ -146,16 +167,21 @@ def _avg_points(trades: list[dict]) -> float | None:
 
 
 def _get_closed_trades(symbol: str, transactions: list[dict] | None) -> list[dict]:
-    """Filter transactions to closed trades for the given symbol."""
+    """Filter transactions to closed trades for the given symbol.
+
+    Uses _SYMBOL_TO_IG_KEYWORDS to match Yahoo symbols to IG instrument names
+    (e.g. "CL=F" → "Oil - US Crude"). Excludes financing/admin fee rows.
+    """
     if not transactions:
         return []
+    keywords = _SYMBOL_TO_IG_KEYWORDS.get(symbol, [symbol.lower()])
     result = []
-    symbol_lower = symbol.lower()
     for t in transactions:
-        # Match by instrument_name containing the symbol
         instrument = (t.get("instrument_name") or "").lower()
-        if symbol_lower in instrument:
-            # Only include trades that have a pnl (i.e., closed)
+        # Skip financing and admin fee rows
+        if "daily" in instrument and ("financing" in instrument or "admin fee" in instrument):
+            continue
+        if any(kw in instrument for kw in keywords):
             if t.get("pnl") is not None:
                 result.append(t)
     return result

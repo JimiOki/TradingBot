@@ -400,6 +400,22 @@ def process_instrument(
     epic = epic_map.get(symbol, "")
     existing_pos = open_positions.get(epic) if epic else None
 
+    # --- Consensus gate: require ≥2 strategies to agree for NEW positions ---
+    # Existing positions are exempt — we still manage them regardless of consensus.
+    MIN_CONSENSUS = 2
+    if not existing_pos:
+        sig_cols = [c for c in row.index if str(c).startswith("sig_")]
+        if sig_cols:
+            sig_vals = [int(row[c]) for c in sig_cols if pd.notna(row.get(c))]
+            longs = sum(1 for v in sig_vals if v == 1)
+            shorts = sum(1 for v in sig_vals if v == -1)
+            consensus = max(longs, shorts)
+            if consensus < MIN_CONSENSUS:
+                result["note"] = f"consensus {consensus}/{len(sig_vals)} < {MIN_CONSENSUS} — no technical edge"
+                result["action"] = "SKIPPED"
+                logger.info("  SKIPPED %s — %s", symbol, result["note"])
+                return result
+
     decision = _load_decision(symbol, signal_date)
     if decision is None:
         if existing_pos:
