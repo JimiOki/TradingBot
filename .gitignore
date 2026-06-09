@@ -8,6 +8,7 @@ data/raw/
 data/tmp/
 data/curated/
 *.parquet
+data/signals/positions_snapshot.json
 *.coverage
 .coverage
 *.png
