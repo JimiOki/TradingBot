@@ -402,7 +402,7 @@ def process_instrument(
 
     # --- Consensus gate: require ≥2 strategies to agree for NEW positions ---
     # Existing positions are exempt — we still manage them regardless of consensus.
-    MIN_CONSENSUS = 2
+    MIN_CONSENSUS = 1
     if not existing_pos:
         sig_cols = [c for c in row.index if str(c).startswith("sig_")]
         if sig_cols:
